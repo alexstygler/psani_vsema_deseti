@@ -2,6 +2,12 @@
 
 Klidný, interaktivní trénink psaní všemi deseti pro českou klávesnici QWERTZ. První verze pro úplné začátečníky i lidi, kteří se chtějí zbavit starých návyků. Výchozí cíl je 300 znaků za minutu.
 
+## Chci jen otevřít aplikaci
+
+Stáhněte si soubor **[lehce.html](lehce.html)** (na GitHubu tlačítko **Download raw file**, šipka dolů vpravo nad souborem). Potom ho otevřete dvojklikem v aktuálním Chrome, Edge nebo Firefoxu. Není potřeba nic instalovat ani spouštět server. Celá aplikace včetně písem je v tomto jediném souboru a funguje bez internetu.
+
+Pokrok si prohlížeč ukládá lokálně. Soubor si nechávejte na stejném místě; při přesunu nebo změně prohlížeče použijte export/import zálohy v Nastavení. Data z dřívější webové adresy se do místního souboru nepřenesou automaticky. Pokud prohlížeč lokální ukládání blokuje, aplikace zobrazí upozornění.
+
 ## Spuštění
 
 Potřebujete Node.js 22.12+ (ověřeno na 24.19) a npm.
@@ -34,7 +40,9 @@ npm run test:e2e
 
 E2E používá systémový Chromium v `/usr/bin/chromium`, je-li dostupný. Jinak nainstalujte browser pomocí `npx playwright install chromium`, případně nastavte `CHROMIUM_PATH` na jeho spustitelný soubor. Testy ověřují skutečné psaní, chybu a opravu, dokončení, historii po obnovení, časový limit, pauzu, složené české znaky, mobilní navigaci, export a přístupnost. Screenshoty se při vizuálním testu zapisují do `/tmp/lehce-desktop.png` a `/tmp/lehce-mobile.png`.
 
-Pro kontrolu produkčního sestavení: `npm run preview -- --port 4173`. Výstup `dist/` lze publikovat na běžném statickém hostingu. Relativní cesty podporují i umístění pod podadresářem. GitHub Actions spouští sestavení a testy; samotný push nezveřejňuje web.
+Samostatný soubor má navíc test s vypnutou sítí: načte se jediný HTML dokument, bez dalších souborů projektu, a ověří se české psaní i historie po obnovení. Spravovaný Chromium v tomto cloudu blokuje navigaci `file://` chybou `ERR_BLOCKED_BY_ADMINISTRATOR`, proto test podává totožný dokument z paměti na testovacím HTTPS originu. Otevření dvojklikem a chování úložiště `file://` v konkrétním uživatelském prohlížeči zde přímo ověřeny nebyly.
+
+Pro kontrolu produkčního sestavení: `npm run preview -- --port 4173`. Výstup `dist/` lze publikovat na běžném statickém hostingu. Relativní cesty podporují i umístění pod podadresářem. `npm run build` navíc vytvoří samostatný soubor `lehce.html` v kořeni projektu; při úpravách aplikace jej znovu sestavte a commitněte společně se zdroji. GitHub Actions spouští sestavení a testy; samotný push nezveřejňuje web.
 
 ## Soukromí a omezení
 
