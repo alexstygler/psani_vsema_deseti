@@ -21,12 +21,13 @@ V cloudovém prostředí s nezapisovatelným domovským adresářem použijte `n
 
 ## Co aplikace umí
 
-- 36 navazujících lekcí v osmi kapitolách: základní poloha, skutečná slova, české věty, diakritika, interpunkce, čísla, Excel a akademické texty. Další lekce se odemkne až po celém textu, alespoň 150 CPM a nejvýše 3 chybných stiscích. Opakování mění text a zvýhodňuje obtížné hmaty.
+- 36 navazujících lekcí v osmi kapitolách: základní poloha, skutečná slova, české věty, diakritika, interpunkce, čísla, Excel a akademické texty. Další lekce se odemkne po celém textu a nejvýše 3 chybných stiscích. Běžné psaní navíc vyžaduje 150 CPM; čísla, znaky a Excel rychlostní podmínku nemají. Opakování mění text a zvýhodňuje obtížné hmaty.
 - Režim Na míru: po dokončených cvičeních zvýhodňuje věty obsahující opakovaně chybované klávesy. Seřazení statistik bere v úvahu i latenci; nejde o strojové učení.
-- Běžné a akademické české texty, čísla a vzorce pro Excel, vlastní vložený text.
+- Běžné a akademické české texty, vlastní text a anglické funkce Excelu (SUM, IF, AVERAGE, COUNT).
+- Tahák a samostatný výběr znaků `< > & / * ( ) + - "` i dalších kombinací. Nápověda používá levý Ctrl + levý Alt; všechny klávesy jsou v základním bloku české QWERTZ, bez numerické klávesnice a navigačního bloku.
 - Cvičení na 1, 2 nebo 5 minut; skončí i dřív při opsání celého textu. Čas se spustí až prvním znakem. Pauza tlačítkem, Escape, ztrátou fokusu a přepnutím karty.
 - Nápovědu fyzických kláves a prstů pro standardní českou QWERTZ Windows/Linux. Diakritiku lze zadávat i pomocí mrtvých kláves. Pro macOS upozorňujeme na odlišné kombinace.
-- Skutečné CPM, přesnost, historii a chyby podle jednotlivých kláves. Lekce je zvládnutá po opsání celého textu s rychlostí alespoň 150 CPM a nejvýše 3 chybnými stisky. Každá lekce má limit 3 minuty; volný trénink zůstává nastavitelný.
+- Skutečné CPM, přesnost, historii a chyby podle jednotlivých kláves. Běžné lekce vyžadují alespoň 150 CPM, celý text a nejvýše 3 chyby, s limitem 3 minut. Čísla, znaky, Excel a kombinace kláves nemají časový ani rychlostní limit a neovlivňují průměr rychlosti běžného psaní.
 - Rostoucí zahrada, lístky za skutečně opsané znaky a zvládnuté lekce, čtyři odznaky a živé úseky plynulých stisků. Žádné povinné série dní.
 - Nastavení cíle a zařízení, omezení animací, režim soustředění, export/import zálohy.
 - Volitelné přihlášení přes vlastní Supabase a synchronizace mezi zařízeními s řešením souběžných zápisů. [Postup připojení a publikování](docs/deployment.md).

@@ -32,13 +32,16 @@ import {
 } from 'lucide-react';
 import CloudSync from './CloudSync';
 import Garden from './Garden';
+import SymbolGuide from './SymbolGuide';
+import { version as appVersion } from '../package.json';
 import {
   addSession,
   lessonPassed,
   lessonUnlocked,
   nextLesson,
   COURSE_VERSION,
-  PASS_CPM,
+  lessonRules,
+  isSpeedPractice,
   MAX_ERRORS,
   defaults,
   fingerNames,
@@ -87,6 +90,7 @@ export default function App() {
   );
   const [lesson, setLesson] = useState(() => nextLesson(progress.completed));
   const [seed, setSeed] = useState(0);
+  const [symbolFocus, setSymbolFocus] = useState('');
   const [modal, setModal] = useState<'intro' | 'help' | 'custom' | 'reset' | null>(null);
   const [custom, setCustom] = useState('');
   const [customDraft, setCustomDraft] = useState('');
@@ -128,7 +132,7 @@ export default function App() {
       }),
     );
   }
-  const last = progress.sessions.at(-1);
+  const last = progress.sessions.filter(isSpeedPractice).at(-1);
   const weak = weakestKeys(progress.keys).filter((k) => k.errors > 0);
   const nav = [
     { id: 'practice' as Page, label: 'Procvičování', icon: Keyboard },
@@ -282,7 +286,10 @@ export default function App() {
                       <button
                         key={m}
                         className={mode === m ? 'active' : ''}
-                        onClick={() => start(m)}
+                        onClick={() => {
+                          if (m === 'symbols') setSymbolFocus('');
+                          start(m);
+                        }}
                       >
                         {m === 'adaptive' && <Sparkles size={15} />}
                         {modeNames[m]}
@@ -310,12 +317,22 @@ export default function App() {
                       <ChevronDown size={13} />
                     </div>
                   </div>
+                  {mode === 'symbols' && (
+                    <SymbolGuide
+                      selected={symbolFocus}
+                      onSelect={(char) => {
+                        setSymbolFocus(char);
+                        start('symbols');
+                      }}
+                    />
+                  )}
                   <Practice
-                    key={`${mode}-${lesson}-${seed}-${progress.settings.duration}`}
+                    key={`${mode}-${lesson}-${seed}-${progress.settings.duration}-${symbolFocus}`}
                     mode={mode}
                     lesson={lesson}
                     seed={seed}
                     custom={custom}
+                    symbolFocus={symbolFocus}
                     progress={progress}
                     onFinish={saveSession}
                     onRestart={() => setSeed((v) => v + 1)}
@@ -469,7 +486,7 @@ export default function App() {
                     disabled={!lessonUnlocked(i, progress.completed)}
                     title={
                       !lessonUnlocked(i, progress.completed)
-                        ? 'Nejprve zvládněte předchozí lekci: 150 CPM a nejvýše 3 chyby.'
+                        ? 'Nejprve zvládněte předchozí lekci podle jejích podmínek.'
                         : undefined
                     }
                     onClick={() => start('beginner', i)}
@@ -487,7 +504,7 @@ export default function App() {
                       <p>
                         {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'} ·{' '}
                         {lessonUnlocked(i, progress.completed)
-                          ? '150 CPM · nejvýše 3 chyby'
+                          ? `${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
                           : 'Zatím zamčeno'}
                       </p>
                     </div>
@@ -496,9 +513,10 @@ export default function App() {
                 ))}
               </div>
               <p className="footnote">
-                Další lekci odemknete opsáním celého textu rychlostí alespoň 150 CPM a nejvýše 3
-                chybnými stisky. Opakování nabízí jiný text. První hmaty ještě nemohou tvořit slova;
-                od čtvrté lekce začínají skutečná slova a později věty.
+                Další lekci odemknete opsáním celého textu s nejvýše 3 chybnými stisky. U běžného
+                psaní navíc platí 150 CPM. Čísla, znaky, vzorce a kombinace kláves procvičujete bez
+                požadavku na rychlost i bez časového limitu. Opakování nabízí jiný text. První hmaty
+                ještě nemohou tvořit slova; od čtvrté lekce začínají skutečná slova a později věty.
               </p>
             </>
           )}
@@ -672,7 +690,7 @@ export default function App() {
               <span className="footer-tag">Méně hledání. Více plynutí.</span>
             </span>
             <span>
-              Vytvořeno pro české prsty <span className="tiny-flower">✳</span>
+              v{appVersion} · Vytvořeno pro české prsty <span className="tiny-flower">✳</span>
             </span>
           </footer>
         </main>
@@ -784,7 +802,8 @@ export default function App() {
               <p>
                 <strong>Kdy se odemkne další lekce?</strong>
                 <br />
-                Celý text, alespoň 150 CPM a nejvýše 3 chybné stisky. Lekce mají limit 3 minuty.
+                Celý text a nejvýše 3 chybné stisky. U běžného psaní navíc alespoň 150 CPM a limit 3
+                minuty. Čísla, znaky, Excel a kombinace kláves nemají rychlostní ani časový limit.
                 Opakování nabízí jiné pořadí slov nebo nové věty. Historie staré verze zůstává, ale
                 nový kurz má vlastní podmínky postupu.
               </p>
@@ -951,6 +970,7 @@ function Practice({
   lesson,
   seed,
   custom,
+  symbolFocus,
   progress,
   onFinish,
   onRestart,
@@ -961,6 +981,7 @@ function Practice({
   lesson: number;
   seed: number;
   custom: string;
+  symbolFocus: string;
   progress: Progress;
   onFinish: (s: Session, keys: Record<string, KeyStat>, complete: boolean) => void;
   onRestart: () => void;
@@ -977,9 +998,16 @@ function Practice({
           (s) => s.mode === 'beginner' && s.lesson === lesson && s.lessonVersion === COURSE_VERSION,
         ).length,
       custom,
+      symbolFocus,
     ),
   );
-  const limit = mode === 'beginner' ? 180 : progress.settings.duration;
+  const rules = lessonRules(lesson);
+  const untimed = mode === 'symbols' || (mode === 'beginner' && rules.minCpm === 0);
+  const limit = untimed
+    ? Infinity
+    : mode === 'beginner'
+      ? rules.timeLimit!
+      : progress.settings.duration;
   const run = useRef<Run>({
     index: 0,
     attempts: 0,
@@ -1044,15 +1072,18 @@ function Practice({
   const finishRef = useRef(finish);
   finishRef.current = finish;
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (run.current.started !== null) {
-        if (run.current.elapsed + (performance.now() - run.current.started) / 1000 >= limit)
-          finishRef.current();
-        else render((v) => v + 1);
-      }
-    }, 100);
+    const timer = window.setInterval(
+      () => {
+        if (run.current.started !== null) {
+          if (run.current.elapsed + (performance.now() - run.current.started) / 1000 >= limit)
+            finishRef.current();
+          else render((v) => v + 1);
+        }
+      },
+      untimed ? 1000 : 100,
+    );
     return () => window.clearInterval(timer);
-  }, [limit]);
+  }, [limit, untimed]);
   useEffect(() => {
     function hide() {
       if (document.hidden) pause();
@@ -1106,7 +1137,7 @@ function Practice({
   }
   const stat = metrics(e.index, e.attempts, e.correct, elapsed());
   const info = keyInfo(target[e.index] ?? '');
-  const remaining = Math.max(0, Math.ceil(limit - elapsed()));
+  const remaining = untimed ? Math.floor(elapsed()) : Math.max(0, Math.ceil(limit - elapsed()));
   const completion = (e.index / Math.max(1, target.length)) * 100;
   let hint = info
     ? `${info.label === 'mezerník' ? 'Mezerník' : info.label} · ${fingerNames[info.finger]}`
@@ -1119,7 +1150,7 @@ function Practice({
     hint =
       progress.settings.os === 'mac'
         ? `${target[e.index]} · kombinaci ověřte v Prohlížeči klávesnice macOS`
-        : `${target[e.index]} · AltGr + ${info.label === '-' ? 'pomlčka (Ctrl + Alt + pomlčka)' : info.label}`;
+        : `${target[e.index]} · Ctrl + Alt + ${info.label === '-' ? 'pomlčka' : info.label}`;
   return (
     <section
       className={`practice-card ${focusMode ? 'focus-mode' : ''}`}
@@ -1137,17 +1168,21 @@ function Practice({
         <div className="session-actions">
           <label className="duration-select">
             <Timer size={14} />
-            <select
-              aria-label="Délka cvičení"
-              value={limit}
-              disabled={mode === 'beginner' || (e.attempts > 0 && !e.done)}
-              onChange={(ev) => onSettings({ duration: Number(ev.target.value) })}
-            >
-              <option value="60">1 min</option>
-              {mode === 'beginner' && <option value="180">3 min · lekce</option>}
-              <option value="120">2 min</option>
-              <option value="300">5 min</option>
-            </select>
+            {untimed ? (
+              <span className="untimed-badge">Bez časového limitu</span>
+            ) : (
+              <select
+                aria-label="Délka cvičení"
+                value={limit}
+                disabled={mode === 'beginner' || (e.attempts > 0 && !e.done)}
+                onChange={(ev) => onSettings({ duration: Number(ev.target.value) })}
+              >
+                <option value="60">1 min</option>
+                {mode === 'beginner' && <option value="180">3 min · lekce</option>}
+                <option value="120">2 min</option>
+                <option value="300">5 min</option>
+              </select>
+            )}
           </label>
           <button
             className={`icon-button ${focusMode ? 'selected' : ''}`}
@@ -1164,8 +1199,8 @@ function Practice({
         <>
           <div className="live-stats">
             <div>
-              <strong>{e.attempts ? stat.cpm : '—'}</strong>
-              <span>znaků / min</span>
+              <strong>{untimed ? e.attempts - e.correct : e.attempts ? stat.cpm : '—'}</strong>
+              <span>{untimed ? 'chybných stisků' : 'znaků / min'}</span>
             </div>
             <div>
               <strong>
@@ -1176,7 +1211,7 @@ function Practice({
             </div>
             <div className="time-stat">
               <strong>{durationLabel(remaining)}</strong>
-              <span>zbývá času</span>
+              <span>{untimed ? 'čistý čas · bez limitu' : 'zbývá času'}</span>
             </div>
           </div>
           <div className="flow-ribbon">
@@ -1188,7 +1223,8 @@ function Practice({
             </span>
             {mode === 'beginner' && (
               <span className={e.attempts - e.correct > MAX_ERRORS ? 'needs-care' : ''}>
-                {e.attempts - e.correct} / 3 chyby · cíl 150 CPM
+                {e.attempts - e.correct} / 3 chyby ·{' '}
+                {rules.minCpm ? 'cíl 150 CPM' : 'rychlost nerozhoduje'}
               </span>
             )}
           </div>
@@ -1341,16 +1377,20 @@ function Practice({
                 </div>
               ))}
               <div className="keyboard-row bottom-row">
-                <span className="key modifier">ctrl</span>
-                <span className="key modifier">{progress.settings.os === 'mac' ? '⌥' : 'alt'}</span>
-                <span className={`key space-key ${info?.code === 'Space' ? 'needed' : ''}`}>
-                  mezerník
+                <span
+                  className={`key modifier ${info?.alt && progress.settings.os !== 'mac' ? 'needed' : ''}`}
+                >
+                  ctrl
                 </span>
                 <span
                   className={`key modifier ${info?.alt && progress.settings.os !== 'mac' ? 'needed' : ''}`}
                 >
-                  {progress.settings.os === 'mac' ? '⌥' : 'alt gr'}
+                  {progress.settings.os === 'mac' ? '⌥' : 'alt'}
                 </span>
+                <span className={`key space-key ${info?.code === 'Space' ? 'needed' : ''}`}>
+                  mezerník
+                </span>
+                <span className="key modifier">{progress.settings.os === 'mac' ? '⌥' : 'alt'}</span>
                 <span className="key modifier">ctrl</span>
               </div>
             </div>
@@ -1427,8 +1467,8 @@ function Practice({
           </p>
           <div className="result-stats">
             <div>
-              <strong>{result.cpm}</strong>
-              <span>znaků / min</span>
+              <strong>{untimed ? result.errors : result.cpm}</strong>
+              <span>{untimed ? 'chyby' : 'znaků / min'}</span>
             </div>
             <div>
               <strong>{result.accuracy} %</strong>
@@ -1439,7 +1479,7 @@ function Practice({
               <span>čistý čas</span>
             </div>
           </div>
-          {result.seconds < 15 && (
+          {!untimed && result.seconds < 15 && (
             <small className="short-result-note">
               Krátké cvičení: údaj o rychlosti je zatím orientační.
             </small>
@@ -1455,10 +1495,16 @@ function Practice({
               <span className={result.finished ? 'met' : ''}>
                 {result.finished ? '✓' : '○'} Celý text opsaný
               </span>
-              <span className={(result.characters / result.seconds) * 60 >= PASS_CPM ? 'met' : ''}>
-                {(result.characters / result.seconds) * 60 >= PASS_CPM ? '✓' : '○'} Rychlost{' '}
-                {result.cpm} / 150 CPM
-              </span>
+              {rules.minCpm > 0 ? (
+                <span
+                  className={(result.characters / result.seconds) * 60 >= rules.minCpm ? 'met' : ''}
+                >
+                  {(result.characters / result.seconds) * 60 >= rules.minCpm ? '✓' : '○'} Rychlost{' '}
+                  {result.cpm} / {rules.minCpm} CPM
+                </span>
+              ) : (
+                <span className="met">✓ Rychlost se nehodnotí · bez časového limitu</span>
+              )}
               <span className={(result.errors ?? 999) <= MAX_ERRORS ? 'met' : ''}>
                 {(result.errors ?? 999) <= MAX_ERRORS ? '✓' : '○'} Chyby {result.errors ?? '—'} / 3
               </span>
@@ -1497,9 +1543,10 @@ function Practice({
 
 function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice: () => void }) {
   const sessions = progress.sessions;
-  const recent = sessions.slice(-12);
-  const avg = sessions.length
-    ? Math.round(sessions.reduce((sum, s) => sum + s.cpm, 0) / sessions.length)
+  const speedSessions = sessions.filter(isSpeedPractice);
+  const recent = speedSessions.slice(-12);
+  const avg = speedSessions.length
+    ? Math.round(speedSessions.reduce((sum, s) => sum + s.cpm, 0) / speedSessions.length)
     : 0;
   const accuracy = sessions.length
     ? Math.round(sessions.reduce((sum, s) => sum + s.accuracy, 0) / sessions.length)
@@ -1531,7 +1578,12 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
         <>
           <div className="stat-card-grid">
             {[
-              { label: 'Průměrná rychlost', value: `${avg}`, unit: 'CPM', icon: TrendingUp },
+              {
+                label: 'Průměrná rychlost',
+                value: speedSessions.length ? `${avg}` : '—',
+                unit: 'CPM',
+                icon: TrendingUp,
+              },
               { label: 'Průměrná přesnost', value: `${accuracy}`, unit: '%', icon: Target },
               {
                 label: 'Čas pro sebe',
@@ -1584,8 +1636,8 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                 ))}
               </div>
               <p className="footnote">
-                CPM jednotlivých cvičení. Různé texty i délky se liší obtížností; důležitá je také
-                přesnost.
+                CPM běžného psaní. Čísla, znaky a Excel se do rychlosti ani průměru nepočítají.
+                Různé texty i délky se liší obtížností; důležitá je také přesnost.
               </p>
             </section>
             <section className="settings-card">
@@ -1636,7 +1688,12 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                           })}
                         </td>
                         <td>{modeNames[s.mode] ?? 'Cvičení'}</td>
-                        <td>{s.cpm} CPM</td>
+                        <td>
+                          {s.mode === 'symbols' ||
+                          (s.mode === 'beginner' && lessonRules(s.lesson).minCpm === 0)
+                            ? 'Bez hodnocení rychlosti'
+                            : `${s.cpm} CPM`}
+                        </td>
                         <td>
                           <span className={`accuracy-badge ${s.accuracy < 90 ? 'needs-care' : ''}`}>
                             {s.accuracy} %

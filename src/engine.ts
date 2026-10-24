@@ -1,5 +1,13 @@
-import { lessons, lessonText, COURSE_VERSION, PASS_CPM, MAX_ERRORS } from './curriculum';
-export { lessons, COURSE_VERSION, PASS_CPM, MAX_ERRORS } from './curriculum';
+import { symbols, symbolPatterns, symbolText } from './symbols';
+import {
+  lessons,
+  lessonText,
+  COURSE_VERSION,
+  PASS_CPM,
+  MAX_ERRORS,
+  lessonRules,
+} from './curriculum';
+export { lessons, COURSE_VERSION, PASS_CPM, MAX_ERRORS, lessonRules } from './curriculum';
 export type Mode = 'adaptive' | 'beginner' | 'text' | 'academic' | 'symbols' | 'custom';
 export type KeyStat = { attempts: number; errors: number; ms: number; samples: number };
 export type Session = {
@@ -74,12 +82,6 @@ const sentences = {
     'Závěry práce vycházejí z kritického rozboru dostupných odborných pramenů.',
     'Předpokládaný vztah mezi proměnnými vyžaduje další empirické ověření.',
   ],
-  symbols: [
-    '=A1*B1 =SUMA(A1:A5) =(12+8)/2 3*4=12',
-    '25 % + 15 % = 40 %; 1 250 Kč; 2026',
-    '=A1+B1 =C2/100 =SUMA(B2:B8) 5*6=30',
-    '(2024–2026) 3,14; 12:30; 50 %; 2+2=4',
-  ],
 };
 export function weakestKeys(keys: Record<string, KeyStat>) {
   return Object.entries(keys)
@@ -98,7 +100,9 @@ export function makeText(
   keys: Record<string, KeyStat>,
   seed = 0,
   custom = '',
+  symbolFocus = '',
 ) {
+  if (mode === 'symbols' && symbolFocus) return symbolText(symbolFocus, seed);
   if (mode === 'custom') return custom.normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 3000);
   if (mode === 'beginner')
     return lessonText(
@@ -109,7 +113,7 @@ export function makeText(
         .map((k) => k.key),
     );
   const source = [
-    ...sentences[mode === 'academic' ? 'academic' : mode === 'symbols' ? 'symbols' : 'text'],
+    ...(mode === 'symbols' ? symbolPatterns : sentences[mode === 'academic' ? 'academic' : 'text']),
   ];
   const weak = weakestKeys(keys)
     .filter((s) => s.errors > 0)
@@ -133,9 +137,16 @@ export function lessonPassed(session: Session) {
     session.lessonVersion === COURSE_VERSION &&
     session.finished === true &&
     session.characters >= 100 &&
-    (session.characters / session.seconds) * 60 >= PASS_CPM &&
+    (lessonRules(session.lesson).minCpm === 0 ||
+      (session.characters / session.seconds) * 60 >= lessonRules(session.lesson).minCpm) &&
     typeof session.errors === 'number' &&
     session.errors <= MAX_ERRORS
+  );
+}
+export function isSpeedPractice(session: Pick<Session, 'mode' | 'lesson'>) {
+  return (
+    session.mode !== 'symbols' &&
+    !(session.mode === 'beginner' && lessonRules(session.lesson).minCpm === 0)
   );
 }
 export function lessonUnlocked(index: number, completed: number[]) {
@@ -377,10 +388,13 @@ function parseKey(s: string): KeyInfo {
   return { label, code, finger: Number(finger) };
 }
 export function keyInfo(char: string): KeyInfo | undefined {
+  if (!char) return undefined;
   if (char === ' ') return { label: 'mezerník', code: 'Space', finger: 8 };
   const digit = '1234567890'.indexOf(char);
   if (digit >= 0) return { ...rows[0][digit + 1], shift: true };
-  const altCodes: Record<string, string> = { '*': 'Slash', '@': 'KeyV', '[': 'KeyF', ']': 'KeyG' };
+  const altCodes = Object.fromEntries(
+    symbols.filter((s) => s.combo.startsWith('Ctrl + Alt')).map((s) => [s.char, s.code]),
+  );
   if (altCodes[char]) return { ...rows.flat().find((k) => k.code === altCodes[char])!, alt: true };
   if (char === 'Ů') return { ...rows[2][9], caps: true };
   if ('ďťňóĎŤŇÓĚŠČŘŽÝÁÍÉÚ'.includes(char) && char) {

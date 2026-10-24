@@ -3196,3 +3196,81 @@ td {
     padding: 22px 18px;
   }
 }
+
+.symbol-guide {
+  padding: 15px 18px;
+  background: #f0f4e9;
+  border: 1px solid #dce5ce;
+  border-radius: 10px;
+  margin-bottom: 17px;
+  color: #435d35;
+}
+.symbol-guide summary {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.8;
+}
+.symbol-guide p {
+  font-size: 11px;
+  line-height: 1.9;
+  color: #5e6e54;
+  margin: 13px 0;
+}
+.symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.symbol-grid button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 61px;
+  border: 1px solid #dce5ce;
+  background: #fffefa;
+  border-radius: 7px;
+  padding: 10px 7px;
+  font-size: 11px;
+}
+.symbol-grid button strong {
+  font-family: 'DM Mono', monospace;
+  font-size: 21px;
+  font-weight: 400;
+}
+.symbol-grid button span {
+  font-size: 9px;
+  color: #5e6e54;
+}
+.symbol-grid button.selected {
+  border-color: #849d6b;
+  background: #e0ecd1;
+}
+.untimed-badge {
+  font-size: 9px;
+  color: #5e6e54;
+  line-height: 1.6;
+}
+.symbol-guide summary:focus-visible {
+  outline: 2px solid #4d7556;
+  outline-offset: 5px;
+}
+@media (max-width: 480px) {
+  .symbol-guide {
+    padding: 13px;
+  }
+  .symbol-guide summary {
+    font-size: 10px;
+  }
+  .symbol-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .symbol-grid button span {
+    font-size: 8px;
+  }
+  .symbol-guide p {
+    font-size: 10px;
+  }
+}

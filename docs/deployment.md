@@ -2,6 +2,8 @@
 
 Zvolené řešení: statický web na GitHub Pages a soukromý pokrok v Supabase. Obě služby mají bezplatnou variantu; jejich limity, podmínky a dostupnost určuje poskytovatel. GitHub Pages je zdarma pro veřejné repozitáře; u soukromého repozitáře ověřte svůj GitHub tarif. Free projekt Supabase může být při neaktivitě pozastaven. Offline lokální režim zůstává funkční.
 
+Web lze zveřejnit hned bez Supabase. Pro první publikování stačí krok 2: povolte GitHub Pages a spusťte workflow. Bez proměnných Supabase poběží plnohodnotně místní režim; synchronizaci připojíte později.
+
 ## 1. Připravte svůj Supabase projekt
 
 1. V Supabase otevřete **SQL Editor → New query**, vložte celý obsah [supabase/schema.sql](../supabase/schema.sql) a spusťte **Run**. SQL je opakovatelné a nepřepisuje existující výsledky.
@@ -12,7 +14,7 @@ Zvolené řešení: statický web na GitHub Pages a soukromý pokrok v Supabase.
 ## 2. Zapněte GitHub Pages
 
 1. V repozitáři `alexstygler/psani_vsema_deseti` otevřete **Settings → Pages → Build and deployment → Source → GitHub Actions**.
-2. V **Settings → Secrets and variables → Actions → Variables** přidejte veřejné proměnné `VITE_SUPABASE_URL` a `VITE_SUPABASE_ANON_KEY` z předchozího kroku. Nejsou to tajné serverové klíče; výsledný web je bude obsahovat.
+2. V **Settings → Secrets and variables → Actions → Variables** pro synchronizaci volitelně přidejte veřejné proměnné `VITE_SUPABASE_URL` a `VITE_SUPABASE_ANON_KEY` z předchozího kroku. Nejsou to tajné serverové klíče; výsledný web je bude obsahovat.
 3. Otevřete **Actions → Publikovat Lehce na GitHub Pages → Run workflow**. Další změny na `main` se publikují automaticky. Výslednou veřejnou adresu vypíše úspěšná úloha `deploy`; samotný commit nedokazuje úspěšné nasazení.
 
 Pokud nebyl změněn název repozitáře ani vlastní doména, očekávaná adresa je `https://alexstygler.github.io/psani_vsema_deseti/`. **Toto je očekávaná adresa, nikoliv potvrzení dostupnosti.** V tomto cloudovém prostředí je GitHub REST API blokováno síťovou politikou, takže zapnutí Pages a stav nasazení musí potvrdit nastavení repozitáře a úspěšný běh Actions.

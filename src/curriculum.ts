@@ -1,6 +1,15 @@
 export const COURSE_VERSION = 2;
 export const PASS_CPM = 150;
 export const MAX_ERRORS = 3;
+// These lessons teach combinations and precision, not prose typing speed.
+const precisionLessons = new Set([26, 27, 28, 29, 30, 31, 33]);
+export function lessonRules(index: number) {
+  return {
+    minCpm: precisionLessons.has(index) ? 0 : PASS_CPM,
+    maxErrors: MAX_ERRORS,
+    timeLimit: precisionLessons.has(index) ? null : 180,
+  };
+}
 type Lesson = {
   title: string;
   subtitle: string;
@@ -396,10 +405,10 @@ export const lessons: Lesson[] = [
   lesson(
     '06 · Čísla v životě',
     'Počítání bez hledání',
-    '+-*/=',
-    '3+4=7|5*6=30|12/3=4|20-8=12|=A1*B1|8+2=10|4*4=16|18/2=9',
+    '<>&/*()+-\"=',
+    'A1<10|B1>5|A1<=B1|A1>=0|A1<>B1|=A1*B1|=(A1+B1)/2|=A1-B1|="A"&"B"|3+4=7|12/3=4|"text"',
     [],
-    'Hvězdička na českém Windows/Linux: AltGr + pomlčka. Ctrl + Alt může zastoupit AltGr.',
+    'Hvězdička na českém Windows/Linux: Ctrl + Alt + pomlčka. Použijte základní blok, nikoliv numerickou klávesnici.',
   ),
   lesson(
     '06 · Čísla v životě',
@@ -414,13 +423,13 @@ export const lessons: Lesson[] = [
       'Poznámka (viz kapitola 3) doplňuje celý výklad.',
       'Závěr [1] navazuje na předchozí studii.',
     ],
-    'Kulaté závorky jsou u P, hranaté na AltGr + F a AltGr + G ve standardní české QWERTZ.',
+    'Kulaté závorky jsou u P, hranaté na Ctrl + Alt + F a Ctrl + Alt + G ve standardní české QWERTZ.',
   ),
   lesson(
     '07 · Psaní pro práci',
     'Excel pod prsty',
-    '=SUMA',
-    '=A1*B1|=SUMA(A1:A5)|=(A1+B1)/2|=C2/100|=SUMA(B2:B8)|=A2-B2|=D1*1,21|=SUMA(C1:C9)',
+    '=SUM',
+    '=SUM(A1:A5)|=AVERAGE(B1:B5)|=IF(A1>10,"yes","no")|=COUNT(C1:C9)|=IF(A1<>"",A1,"empty")|="A"&"B"|=(A1+B1)/2|=A1*B1',
     [],
     'Vzorce jsou smysluplné celky, i když nejsou větami. Trénujte jejich rytmus jako známou frázi.',
   ),
@@ -437,7 +446,7 @@ export const lessons: Lesson[] = [
       'Nové dotazy posílejte na podpora@example.com',
       'Záloha dat má název data_pro_analyzu.',
     ],
-    'Zavináč na české QWERTZ Windows/Linux: AltGr + V. Podtržítko: Shift + pomlčka.',
+    'Zavináč na české QWERTZ Windows/Linux: Ctrl + Alt + V. Podtržítko: Shift + pomlčka.',
   ),
   lesson(
     '07 · Psaní pro práci',
@@ -492,7 +501,7 @@ export const lessons: Lesson[] = [
     [
       'Dobrý den, posílám vám upravený text a děkuji za všechny připomínky.',
       'Rozpočet zahrnuje 3 položky: dopravu, ubytování a společný program.',
-      'Výsledek =SUMA(A1:A5) ještě porovnáme s původním odhadem.',
+      'Výsledek součtu ještě porovnáme s původním odhadem.',
       'Až bude práce hotová, dopřejeme si chvíli odpočinku a šálek čaje.',
       'Zvládnuté hmaty vám uvolní pozornost pro nápady, otázky i vlastní příběhy.',
       'Nejdůležitější není dokonalý den, ale chuť se po nějaké době zase vrátit.',
