@@ -2826,3 +2826,373 @@ td {
     scroll-behavior: auto !important;
   }
 }
+
+/* A small garden rewards completed effort, with no daily streak to lose. */
+.garden {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  padding: 24px;
+  margin: 0 0 24px;
+  background: linear-gradient(120deg, #e8f0db, #f6f5e9);
+  border: 1px solid #dce7ce;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.garden-growth {
+  flex: 1;
+  min-width: 0;
+}
+.garden h2 {
+  font-family: Lora, serif;
+  font-size: 24px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.garden h2 span {
+  font-family: Manrope, sans-serif;
+  font-size: 11px;
+  color: #5e6e54;
+}
+.garden .eyebrow {
+  font-size: 8px;
+}
+.garden p {
+  font-size: 10px;
+  color: #5e6e54;
+  line-height: 1.8;
+  margin-top: 9px;
+}
+.garden-meter {
+  height: 5px;
+  max-width: 360px;
+  border-radius: 10px;
+  background: #d5dfc6;
+  margin-top: 13px;
+  overflow: hidden;
+}
+.garden-meter span {
+  display: block;
+  height: 100%;
+  background: #7b9a59;
+  border-radius: 10px;
+  transition: width 0.6s;
+}
+.garden-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.garden-badges > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+  padding: 5px 7px;
+  border: 1px dashed #aab79c;
+  border-radius: 12px;
+  color: #5e6e54;
+}
+.garden-badges > .earned {
+  background: #dbe9c4;
+  border-style: solid;
+  border-color: #b1c594;
+  color: #3e5832;
+}
+.garden-plant {
+  position: relative;
+  width: 90px;
+  height: 105px;
+  flex-shrink: 0;
+}
+.plant-soil {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 80px;
+  height: 16px;
+  background: #c3a884;
+  border-radius: 50%;
+}
+.plant-stem {
+  width: 3px;
+  height: 65px;
+  background: #86a467;
+  position: absolute;
+  left: 43px;
+  bottom: 15px;
+  transform-origin: bottom;
+}
+.plant-leaf {
+  position: absolute;
+  color: #76935e;
+  fill: #b7ce9b;
+  width: 30px;
+  height: 30px;
+  bottom: 37px;
+}
+.plant-leaf.left {
+  left: 15px;
+  transform: rotate(-70deg);
+}
+.plant-leaf.right {
+  left: 44px;
+  bottom: 53px;
+  transform: rotate(10deg);
+}
+.plant-bloom {
+  position: absolute;
+  left: 29px;
+  top: 7px;
+  color: #709151;
+  width: 32px;
+  height: 32px;
+}
+.plant-stage-0 .plant-stem {
+  height: 30px;
+}
+.plant-stage-0 .plant-leaf {
+  display: none;
+}
+.plant-stage-0 .plant-bloom {
+  top: 48px;
+}
+.plant-stage-1 .plant-bloom {
+  top: 15px;
+}
+.plant-stage-3 .plant-bloom,
+.plant-stage-4 .plant-bloom {
+  color: #c39454;
+  fill: #f2dfb0;
+  width: 40px;
+  height: 40px;
+  left: 25px;
+  top: -1px;
+}
+.garden-plant {
+  animation: plant-sway 5s ease-in-out infinite;
+}
+.lesson-card:disabled {
+  opacity: 1;
+  color: #69755f;
+  background: #f1f3ec;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+.lesson-card:disabled:hover {
+  transform: none;
+  border-color: #dfe4d6;
+}
+.lesson-card:disabled .lesson-number {
+  background: #e7ebdf;
+  color: #5e6e54;
+}
+.flow-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 28px 20px;
+  font-size: 10px;
+  color: #5e6e54;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #f0f5e8;
+}
+.flow-ribbon > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.flow-glow {
+  color: #385b28 !important;
+  font-weight: 700;
+}
+.flow-ribbon .needs-care {
+  color: #985a39;
+}
+.pass-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  width: min(100%, 370px);
+  text-align: left;
+  margin: 15px 0 0;
+  padding: 15px;
+  border: 1px solid #e4e7dc;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #8d573b;
+  background: #fbf6eb;
+}
+.pass-checklist .met {
+  color: #496d39;
+}
+.pass-checklist p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #5e6e54;
+  border-top: 1px solid #e4e7dc;
+  padding-top: 10px;
+}
+.cloud-card {
+  margin-top: 25px;
+}
+.cloud-title {
+  display: flex;
+  gap: 17px;
+  align-items: flex-start;
+}
+.cloud-title > svg {
+  color: #658151;
+  margin-top: 4px;
+}
+.cloud-title h2 {
+  font:
+    400 25px Lora,
+    serif;
+  margin-bottom: 10px;
+}
+.cloud-title p,
+.cloud-form > p,
+.cloud-account > p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #5e6e54;
+  max-width: 750px;
+}
+.cloud-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #526d43;
+  font-size: 11px;
+  margin: 20px 0;
+}
+.cloud-error {
+  color: #984a39;
+}
+.cloud-form {
+  max-width: 600px;
+}
+.cloud-form > p {
+  margin-bottom: 22px;
+}
+.cloud-form input {
+  font-size: 13px;
+  min-height: 43px;
+}
+.cloud-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cloud-attach {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  margin: 20px 0;
+}
+.cloud-account > span {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 16px;
+}
+.cloud-account > div {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 17px;
+}
+.cloud-form .cloud-buttons + p {
+  margin-top: 20px;
+  font-size: 10px;
+}
+.cloud-account > p + p {
+  margin-top: 12px;
+  font-size: 10px;
+}
+@keyframes plant-sway {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+@media (max-width: 1020px) {
+  .garden {
+    gap: 18px;
+    padding: 21px;
+  }
+  .garden > .primary-button {
+    font-size: 10px;
+    padding: 11px;
+  }
+  .garden-plant {
+    width: 75px;
+  }
+  .garden-badges {
+    max-width: 350px;
+  }
+}
+@media (max-width: 600px) {
+  .garden {
+    padding: 18px 15px;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+  .garden-plant {
+    width: 57px;
+    height: 85px;
+    transform: scale(0.8);
+    margin-left: -8px;
+  }
+  .garden-growth {
+    min-width: 185px;
+  }
+  .garden h2 {
+    font-size: 21px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .garden .eyebrow {
+    font-size: 6px;
+    letter-spacing: 1px;
+  }
+  .garden > .primary-button {
+    width: 100%;
+    font-size: 12px;
+  }
+  .garden-badges {
+    max-width: none;
+  }
+  .garden p {
+    font-size: 9px;
+  }
+  .garden-badges > span {
+    font-size: 8px;
+  }
+  .flow-ribbon {
+    margin: 0 18px 20px;
+    font-size: 8px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cloud-title h2 {
+    font-size: 22px;
+  }
+  .cloud-title p {
+    font-size: 11px;
+  }
+  .cloud-card {
+    padding: 22px 18px;
+  }
+}

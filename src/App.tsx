@@ -30,7 +30,16 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react';
+import CloudSync from './CloudSync';
+import Garden from './Garden';
 import {
+  addSession,
+  lessonPassed,
+  lessonUnlocked,
+  nextLesson,
+  COURSE_VERSION,
+  PASS_CPM,
+  MAX_ERRORS,
   defaults,
   fingerNames,
   freshProgress,
@@ -76,7 +85,7 @@ export default function App() {
   const [mode, setMode] = useState<Mode>(() =>
     progress.settings.level === 'beginner' ? 'beginner' : 'adaptive',
   );
-  const [lesson, setLesson] = useState(0);
+  const [lesson, setLesson] = useState(() => nextLesson(progress.completed));
   const [seed, setSeed] = useState(0);
   const [modal, setModal] = useState<'intro' | 'help' | 'custom' | 'reset' | null>(null);
   const [custom, setCustom] = useState('');
@@ -102,34 +111,22 @@ export default function App() {
     setMobileNav(false);
     window.scrollTo({ top: 0 });
   }
-  function start(m: Mode, l = 0) {
+  function start(m: Mode, l = nextLesson(progress.completed)) {
+    if (m === 'beginner' && !lessonUnlocked(l, progress.completed)) return;
     setMode(m);
     setLesson(l);
     setSeed((v) => v + 1);
     navigate('practice');
   }
   function saveSession(session: Session, keys: Record<string, KeyStat>, complete: boolean) {
-    setProgress((p) => {
-      const combined = { ...p.keys };
-      for (const [key, stat] of Object.entries(keys)) {
-        const previous = combined[key] ?? { attempts: 0, errors: 0, ms: 0, samples: 0 };
-        combined[key] = {
-          attempts: previous.attempts + stat.attempts,
-          errors: previous.errors + stat.errors,
-          ms: previous.ms + stat.ms,
-          samples: previous.samples + stat.samples,
-        };
-      }
-      return {
-        ...p,
-        keys: combined,
-        sessions: [...p.sessions, session].slice(-500),
-        completed:
-          complete && session.mode === 'beginner' && session.accuracy >= 95
-            ? [...new Set([...p.completed, session.lesson])]
-            : p.completed,
-      };
-    });
+    setProgress((p) =>
+      addSession(p, {
+        ...session,
+        keyStats: keys,
+        finished: complete,
+        lessonVersion: COURSE_VERSION,
+      }),
+    );
   }
   const last = progress.sessions.at(-1);
   const weak = weakestKeys(progress.keys).filter((k) => k.errors > 0);
@@ -195,7 +192,7 @@ export default function App() {
           </button>
           <div className="local-note">
             <span className="status-dot" />
-            Váš pokrok zůstává u vás
+            Váš prostor. Vaše tempo.
           </div>
         </div>
       </aside>
@@ -277,6 +274,7 @@ export default function App() {
                   </button>
                 </div>
               )}
+              <Garden progress={progress} onContinue={() => start('beginner')} />
               <div className="workspace-grid">
                 <div className="practice-column">
                   <div className="mode-tabs" role="group" aria-label="Druh cvičení">
@@ -468,6 +466,12 @@ export default function App() {
                   <button
                     className={`lesson-card ${progress.completed.includes(i) ? 'complete' : ''}`}
                     key={l.title}
+                    disabled={!lessonUnlocked(i, progress.completed)}
+                    title={
+                      !lessonUnlocked(i, progress.completed)
+                        ? 'Nejprve zvládněte předchozí lekci: 150 CPM a nejvýše 3 chyby.'
+                        : undefined
+                    }
                     onClick={() => start('beginner', i)}
                   >
                     <div className="lesson-number">
@@ -480,15 +484,21 @@ export default function App() {
                     <div>
                       <span>{l.subtitle}</span>
                       <h3>{l.title}</h3>
-                      <p>{l.keys.split('').slice(0, 10).join(' ')}</p>
+                      <p>
+                        {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'} ·{' '}
+                        {lessonUnlocked(i, progress.completed)
+                          ? '150 CPM · nejvýše 3 chyby'
+                          : 'Zatím zamčeno'}
+                      </p>
                     </div>
                     <ArrowRight size={18} />
                   </button>
                 ))}
               </div>
               <p className="footnote">
-                Všechny lekce jsou otevřené. Pro označení lekce jako zvládnuté opište celý text s
-                přesností alespoň 95 %.
+                Další lekci odemknete opsáním celého textu rychlostí alespoň 150 CPM a nejvýše 3
+                chybnými stisky. Opakování nabízí jiný text. První hmaty ještě nemohou tvořit slova;
+                od čtvrté lekce začínají skutečná slova a později věty.
               </p>
             </>
           )}
@@ -588,9 +598,9 @@ export default function App() {
                   <div>
                     <h2>Váš pokrok je váš.</h2>
                     <p>
-                      Ukládá se jen v tomto prohlížeči. Bez účtu a sledování. Mezi notebookem a
-                      jiným počítačem se zatím nepřenáší automaticky; na stejné zařízení můžete
-                      připojit libovolnou klávesnici.
+                      Bez přihlášení zůstává v tomto prohlížeči. Pro automatický přenos mezi
+                      zařízeními připojte níže svůj Supabase projekt a přihlaste se ke stejnému
+                      účtu. Ruční zálohy fungují i offline.
                     </p>
                   </div>
                   <div className="data-actions">
@@ -623,7 +633,11 @@ export default function App() {
                           try {
                             const raw = await file.text();
                             const p = JSON.parse(raw);
-                            if (p.version !== 1 || !Array.isArray(p.sessions) || !p.keys)
+                            if (
+                              ![1, 2].includes(p.version) ||
+                              !Array.isArray(p.sessions) ||
+                              !p.keys
+                            )
                               throw Error();
                             const parsed = parseProgress(raw);
                             if (!window.confirm('Nahradit současný pokrok touto zálohou?')) return;
@@ -651,6 +665,7 @@ export default function App() {
               </p>
             </>
           )}
+          <CloudSync progress={progress} setProgress={setProgress} visible={page === 'settings'} />
           <footer>
             <span>
               lehce<span className="brand-dot">.</span>
@@ -765,6 +780,13 @@ export default function App() {
                 Po dokončení uložíme rychlost, přesnost a obtížné klávesy. Na míru upřednostňuje
                 věty obsahující vaše chybové znaky. Dokud nemáme data, nabízí běžné české věty.
                 Aplikace neumí zjistit, kterým prstem píšete nebo zda se díváte na ruce.
+              </p>
+              <p>
+                <strong>Kdy se odemkne další lekce?</strong>
+                <br />
+                Celý text, alespoň 150 CPM a nejvýše 3 chybné stisky. Lekce mají limit 3 minuty.
+                Opakování nabízí jiné pořadí slov nebo nové věty. Historie staré verze zůstává, ale
+                nový kurz má vlastní podmínky postupu.
               </p>
               <p>
                 <strong>Co znamená CPM?</strong>
@@ -921,6 +943,8 @@ type Run = {
   error: string;
   done: boolean;
   paused: boolean;
+  combo: number;
+  bestCombo: number;
 };
 function Practice({
   mode,
@@ -943,7 +967,19 @@ function Practice({
   onNext: () => void;
   onSettings: (s: Partial<Settings>) => void;
 }) {
-  const [target] = useState(() => makeText(mode, lesson, progress.keys, seed, custom));
+  const [target] = useState(() =>
+    makeText(
+      mode,
+      lesson,
+      progress.keys,
+      seed +
+        progress.sessions.filter(
+          (s) => s.mode === 'beginner' && s.lesson === lesson && s.lessonVersion === COURSE_VERSION,
+        ).length,
+      custom,
+    ),
+  );
+  const limit = mode === 'beginner' ? 180 : progress.settings.duration;
   const run = useRef<Run>({
     index: 0,
     attempts: 0,
@@ -955,6 +991,8 @@ function Practice({
     error: '',
     done: false,
     paused: false,
+    combo: 0,
+    bestCombo: 0,
   });
   const [, render] = useState(0);
   const [focused, setFocused] = useState(false);
@@ -980,7 +1018,7 @@ function Practice({
   }
   function finish() {
     if (e.done || !e.attempts) return;
-    const seconds = Math.min(progress.settings.duration, Math.max(elapsed(), 0.1));
+    const seconds = Math.min(limit, Math.max(elapsed(), 0.1));
     e.elapsed = seconds;
     e.started = null;
     e.done = true;
@@ -994,6 +1032,10 @@ function Practice({
       mode,
       lesson,
       device: progress.settings.device,
+      errors: e.attempts - e.correct,
+      finished: e.index >= target.length,
+      lessonVersion: COURSE_VERSION,
+      bestCombo: e.bestCombo,
     };
     onFinish(session, e.keys, e.index >= target.length);
     setResult(session);
@@ -1004,16 +1046,13 @@ function Practice({
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (run.current.started !== null) {
-        if (
-          run.current.elapsed + (performance.now() - run.current.started) / 1000 >=
-          progress.settings.duration
-        )
+        if (run.current.elapsed + (performance.now() - run.current.started) / 1000 >= limit)
           finishRef.current();
         else render((v) => v + 1);
       }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [progress.settings.duration]);
+  }, [limit]);
   useEffect(() => {
     function hide() {
       if (document.hidden) pause();
@@ -1039,7 +1078,7 @@ function Practice({
       return;
     }
     if (!chars.length || !target.length) return;
-    if (elapsed() >= progress.settings.duration) {
+    if (elapsed() >= limit) {
       finish();
       return;
     }
@@ -1054,17 +1093,20 @@ function Practice({
     if (correct) {
       e.index++;
       e.correct++;
+      e.combo++;
+      e.bestCombo = Math.max(e.bestCombo, e.combo);
       e.error = '';
       setNotice('');
     } else {
       e.error = chars[0];
+      e.combo = 0;
     }
     if (e.index >= target.length) finish();
     update();
   }
   const stat = metrics(e.index, e.attempts, e.correct, elapsed());
   const info = keyInfo(target[e.index] ?? '');
-  const remaining = Math.max(0, Math.ceil(progress.settings.duration - elapsed()));
+  const remaining = Math.max(0, Math.ceil(limit - elapsed()));
   const completion = (e.index / Math.max(1, target.length)) * 100;
   let hint = info
     ? `${info.label === 'mezerník' ? 'Mezerník' : info.label} · ${fingerNames[info.finger]}`
@@ -1076,8 +1118,8 @@ function Practice({
   if (info?.alt)
     hint =
       progress.settings.os === 'mac'
-        ? '* · kombinaci ověřte v Prohlížeči klávesnice macOS'
-        : '* · AltGr + pomlčka (Ctrl + Alt + pomlčka)';
+        ? `${target[e.index]} · kombinaci ověřte v Prohlížeči klávesnice macOS`
+        : `${target[e.index]} · AltGr + ${info.label === '-' ? 'pomlčka (Ctrl + Alt + pomlčka)' : info.label}`;
   return (
     <section
       className={`practice-card ${focusMode ? 'focus-mode' : ''}`}
@@ -1097,11 +1139,12 @@ function Practice({
             <Timer size={14} />
             <select
               aria-label="Délka cvičení"
-              value={progress.settings.duration}
-              disabled={e.attempts > 0 && !e.done}
+              value={limit}
+              disabled={mode === 'beginner' || (e.attempts > 0 && !e.done)}
               onChange={(ev) => onSettings({ duration: Number(ev.target.value) })}
             >
               <option value="60">1 min</option>
+              {mode === 'beginner' && <option value="180">3 min · lekce</option>}
               <option value="120">2 min</option>
               <option value="300">5 min</option>
             </select>
@@ -1135,6 +1178,19 @@ function Practice({
               <strong>{durationLabel(remaining)}</strong>
               <span>zbývá času</span>
             </div>
+          </div>
+          <div className="flow-ribbon">
+            <span className={e.combo >= 20 ? 'flow-glow' : ''}>
+              <Sparkles size={14} />{' '}
+              {e.combo >= 20
+                ? `${e.combo} plynulých stisků · krásný rytmus!`
+                : `Plynulý úsek: ${e.combo} / 20`}
+            </span>
+            {mode === 'beginner' && (
+              <span className={e.attempts - e.correct > MAX_ERRORS ? 'needs-care' : ''}>
+                {e.attempts - e.correct} / 3 chyby · cíl 150 CPM
+              </span>
+            )}
           </div>
           <div
             className={`typing-area ${focused ? 'focused' : ''} ${e.error ? 'has-error' : ''}`}
@@ -1193,6 +1249,7 @@ function Practice({
                   input.current?.blur();
                 }
                 if (ev.key === 'Backspace') {
+                  e.combo = 0;
                   ev.preventDefault();
                   if (e.error) e.error = '';
                   else if (e.index > 0) e.index--;
@@ -1354,7 +1411,15 @@ function Practice({
             <Leaf size={34} strokeWidth={1.5} />
           </span>
           <div className="eyebrow">DALŠÍ MALÝ KROK JE ZA VÁMI</div>
-          <h2>{result.accuracy >= 95 ? 'Tohle byl dobrý rytmus.' : 'Každý pokus vás něco učí.'}</h2>
+          <h2>
+            {mode === 'beginner'
+              ? lessonPassed(result)
+                ? 'Další kousek zahrady odemčen!'
+                : 'Ještě jeden krok k jistotě.'
+              : result.accuracy >= 95
+                ? 'Tohle byl dobrý rytmus.'
+                : 'Každý pokus vás něco učí.'}
+          </h2>
           <p>
             {result.accuracy >= 95
               ? 'Jistota roste s každým správným stiskem. Klidně to pro dnešek stačí.'
@@ -1379,18 +1444,42 @@ function Practice({
               Krátké cvičení: údaj o rychlosti je zatím orientační.
             </small>
           )}
-          {mode === 'beginner' && e.index >= target.length && result.accuracy >= 95 && (
+          {mode === 'beginner' && lessonPassed(result) && (
             <p className="lesson-completed">
               <Check size={17} />
               Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.
             </p>
+          )}
+          {mode === 'beginner' && (
+            <div className="pass-checklist">
+              <span className={result.finished ? 'met' : ''}>
+                {result.finished ? '✓' : '○'} Celý text opsaný
+              </span>
+              <span className={(result.characters / result.seconds) * 60 >= PASS_CPM ? 'met' : ''}>
+                {(result.characters / result.seconds) * 60 >= PASS_CPM ? '✓' : '○'} Rychlost{' '}
+                {result.cpm} / 150 CPM
+              </span>
+              <span className={(result.errors ?? 999) <= MAX_ERRORS ? 'met' : ''}>
+                {(result.errors ?? 999) <= MAX_ERRORS ? '✓' : '○'} Chyby {result.errors ?? '—'} / 3
+              </span>
+              {!lessonPassed(result) && (
+                <p>
+                  {(result.errors ?? 0) > 3
+                    ? 'Nejdřív zpomalte a zkuste přesné hmaty.'
+                    : !result.finished
+                      ? 'Zkuste se dostat až na konec textu.'
+                      : 'Přesnost už máte. Zkuste udržet souvislejší rytmus.'}{' '}
+                  Další pokus použije jiné pořadí slov nebo jiné věty.
+                </p>
+              )}
+            </div>
           )}
           <div className="result-actions">
             <button className="quiet-button" onClick={onRestart}>
               <RotateCcw size={16} />
               Ještě jeden malý krok
             </button>
-            {mode === 'beginner' && lesson < lessons.length - 1 && (
+            {mode === 'beginner' && lessonPassed(result) && lesson < lessons.length - 1 && (
               <button className="primary-button" onClick={onNext}>
                 Další lekce <ArrowRight size={16} />
               </button>
@@ -1398,7 +1487,7 @@ function Practice({
           </div>
           <span className="saved-note">
             <Check size={14} />
-            Pokrok se uložil do tohoto prohlížeče
+            Cvičení najdete v přehledu Můj pokrok
           </span>
         </div>
       )}

@@ -14,10 +14,10 @@ test('začátečník dokončí lekci, chyby se zaznamenají a pokrok přežije o
   const input = page.getByRole('textbox', { name: 'Psací pole' });
   await page.getByRole('button', { name: 'Klikněte sem' }).click();
   await input.pressSequentially('x');
-  await expect(page.locator('.typing-feedback')).toContainText('Zkuste „f“');
+  await expect(page.locator('.typing-feedback')).toContainText(`Zkuste „${target![0]}“`);
   await input.pressSequentially(target!, { delay: 5 });
   await expect(page.getByRole('status')).toContainText('Lekce zvládnutá');
-  await expect(page.locator('.result-stats')).toContainText('98 %');
+  await expect(page.locator('.result-stats')).toContainText('99 %');
   await page.getByRole('button', { name: 'Můj pokrok', exact: true }).click();
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.reload();

@@ -1,3 +1,5 @@
+import { lessons, lessonText, COURSE_VERSION, PASS_CPM, MAX_ERRORS } from './curriculum';
+export { lessons, COURSE_VERSION, PASS_CPM, MAX_ERRORS } from './curriculum';
 export type Mode = 'adaptive' | 'beginner' | 'text' | 'academic' | 'symbols' | 'custom';
 export type KeyStat = { attempts: number; errors: number; ms: number; samples: number };
 export type Session = {
@@ -10,6 +12,11 @@ export type Session = {
   mode: Mode;
   lesson: number;
   device: string;
+  errors?: number;
+  finished?: boolean;
+  lessonVersion?: number;
+  keyStats?: Record<string, KeyStat>;
+  bestCombo?: number;
 };
 export type Settings = {
   level: 'retrain' | 'beginner';
@@ -21,7 +28,8 @@ export type Settings = {
   reducedMotion: boolean;
 };
 export type Progress = {
-  version: 1;
+  version: 2;
+  baselineKeys: Record<string, KeyStat>;
   settings: Settings;
   keys: Record<string, KeyStat>;
   sessions: Session[];
@@ -39,85 +47,14 @@ export const defaults: Settings = {
   reducedMotion: false,
 };
 export const freshProgress = (): Progress => ({
-  version: 1,
+  version: 2,
+  baselineKeys: {},
   settings: { ...defaults },
   keys: {},
   sessions: [],
   completed: [],
   onboarded: false,
 });
-export const lessons = [
-  {
-    title: 'Najděte svůj domov',
-    subtitle: 'Základní poloha · F a J',
-    keys: 'fj',
-    text: 'fff jjj fjf jfj ff jj fj jf fjfj jfjf ffjj jjff fj jf',
-    tip: 'Ukazováčky položte na F a J. Malé výstupky najdete i bez pohledu na klávesnici.',
-  },
-  {
-    title: 'První souhra',
-    subtitle: 'Základní řada · D a K',
-    keys: 'dfjk',
-    text: 'dd kk dk kd df jk fd kj dkjf fjdk df jk fd kj ddk fjj dk',
-    tip: 'Prostředníčky patří na D a K. Po každém stisku se vraťte do základní polohy.',
-  },
-  {
-    title: 'Zapojte prsteníčky',
-    subtitle: 'Základní řada · S a L',
-    keys: 'sdfjkl',
-    text: 'ss ll sl ls sd fl jk ls dl sf skl fjs sdf jkl sl ds kl fj',
-    tip: 'Prsteníčky ovládají S a L. Klidně zpomalte, důležitější je správný prst.',
-  },
-  {
-    title: 'Každý prst má své místo',
-    subtitle: 'Základní řada · A a Ů',
-    keys: 'asdfjklů',
-    text: 'aa ůů aů ůa sad dal jak klad sklad klas skla klasů skladů',
-    tip: 'Malíčky položte na A a Ů. Mezerník stiskněte palcem, který je vám příjemnější.',
-  },
-  {
-    title: 'Malý krok doprostřed',
-    subtitle: 'Základní řada · G a H',
-    keys: 'asdfghjklů',
-    text: 'had hlad hala hlas hlasů hladů dala hlas a dal sklad klad',
-    tip: 'G ovládá levý ukazováček a H pravý. Ostatní prsty zůstávají u základní řady.',
-  },
-  {
-    title: 'O řadu výš',
-    subtitle: 'Horní řada · E, R, T, U, I, O',
-    keys: 'ertuio',
-    text: 'ruka roste jako les teta jede daleko radost a klid',
-    tip: 'Při cestě k horní řadě nepřesouvejte celou ruku. Po stisku se prst vrací domů.',
-  },
-  {
-    title: 'Celá abeceda',
-    subtitle: 'Horní a dolní řada · QWERTZ',
-    keys: 'qwertzuiopzxcvbnmy',
-    text: 'v malem domku bydlel vesely pes a jeho novy kamarad',
-    tip: 'Na české QWERTZ je Z nahoře a Y vlevo dole. Hledejte klávesy prsty, ne očima.',
-  },
-  {
-    title: 'Čeština se vším všudy',
-    subtitle: 'Diakritika · ěščřžýáíéúů',
-    keys: 'ěščřžýáíéúů',
-    text: 'příliš žluťoučký kůň úpěl ďábelské ódy český příběh začíná právě teď',
-    tip: 'Česká písmena jsou i na horní číselné řadě. Dlouhé ú najdete vedle P, ů vedle L.',
-  },
-  {
-    title: 'Věty mají rytmus',
-    subtitle: 'Velká písmena a interpunkce',
-    keys: '.,!?',
-    text: 'Dnes je příjemný den. Jak se máte? Psaní může být radost, stačí začít pomalu.',
-    tip: 'Pro velké písmeno použijte Shift opačné ruky. Netlačte do kláves a nezvedejte ramena.',
-  },
-  {
-    title: 'Čísla, vzorce a nápady',
-    subtitle: 'Čísla a znaky pro každodenní práci',
-    keys: '1234567890=*()+-:',
-    text: '=A1*B1 =SUMA(A1:A5) =(12+8)/2 25 % 3*4=12 2026',
-    tip: 'V českém rozložení Windows/Linux bývá * na AltGr + klávese s pomlčkou (vedle pravého Shiftu). Ctrl + Alt může fungovat jako AltGr.',
-  },
-];
 const sentences = {
   text: [
     'Ráno si otevřu okno a na chvíli pustím do pokoje čerstvý vzduch.',
@@ -163,7 +100,14 @@ export function makeText(
   custom = '',
 ) {
   if (mode === 'custom') return custom.normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 3000);
-  if (mode === 'beginner') return lessons[Math.max(0, Math.min(lesson, lessons.length - 1))].text;
+  if (mode === 'beginner')
+    return lessonText(
+      lesson,
+      seed,
+      weakestKeys(keys)
+        .filter((k) => k.errors > 0)
+        .map((k) => k.key),
+    );
   const source = [
     ...sentences[mode === 'academic' ? 'academic' : mode === 'symbols' ? 'symbols' : 'text'],
   ];
@@ -179,8 +123,107 @@ export function makeText(
 }
 export function metrics(characters: number, attempts: number, correct: number, seconds: number) {
   return {
-    cpm: seconds > 0 ? Math.round((characters / seconds) * 60) : 0,
+    cpm: seconds > 0 ? Math.floor((characters / seconds) * 60) : 0,
     accuracy: attempts ? Math.round((correct / attempts) * 100) : 100,
+  };
+}
+export function lessonPassed(session: Session) {
+  return (
+    session.mode === 'beginner' &&
+    session.lessonVersion === COURSE_VERSION &&
+    session.finished === true &&
+    session.characters >= 100 &&
+    (session.characters / session.seconds) * 60 >= PASS_CPM &&
+    typeof session.errors === 'number' &&
+    session.errors <= MAX_ERRORS
+  );
+}
+export function lessonUnlocked(index: number, completed: number[]) {
+  return index === 0 || completed.includes(index) || completed.includes(index - 1);
+}
+export function nextLesson(completed: number[]) {
+  return Math.max(
+    0,
+    lessons.findIndex((_, i) => !completed.includes(i)),
+  );
+}
+export function cleanKeys(value: unknown): Record<string, KeyStat> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, s]) =>
+        key.length === 1 &&
+        s &&
+        [s.attempts, s.errors, s.ms, s.samples].every(
+          (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0,
+        ) &&
+        s.errors <= s.attempts,
+    ),
+  );
+}
+export function mergeProgress(local: Progress, remote: Progress): Progress {
+  const sessions = new Map<string, Session>();
+  for (const s of [...remote.sessions, ...local.sessions]) {
+    const previous = sessions.get(s.id);
+    if (!previous || JSON.stringify(s).localeCompare(JSON.stringify(previous)) > 0)
+      sessions.set(s.id, s);
+  }
+  const combined = [...sessions.values()].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+  );
+  const baselineKeys: Record<string, KeyStat> = {};
+  for (const source of [remote.baselineKeys ?? {}, local.baselineKeys ?? {}])
+    for (const [key, stat] of Object.entries(source)) {
+      const old = baselineKeys[key] ?? { attempts: 0, errors: 0, ms: 0, samples: 0 };
+      baselineKeys[key] = {
+        attempts: Math.max(old.attempts, stat.attempts),
+        errors: Math.max(old.errors, stat.errors),
+        ms: Math.max(old.ms, stat.ms),
+        samples: Math.max(old.samples, stat.samples),
+      };
+    }
+  const keys = { ...baselineKeys };
+  for (const s of combined)
+    for (const [key, stat] of Object.entries(cleanKeys(s.keyStats))) {
+      const old = keys[key] ?? { attempts: 0, errors: 0, ms: 0, samples: 0 };
+      keys[key] = {
+        attempts: old.attempts + stat.attempts,
+        errors: old.errors + stat.errors,
+        ms: old.ms + stat.ms,
+        samples: old.samples + stat.samples,
+      };
+    }
+  return {
+    ...local,
+    version: 2,
+    baselineKeys,
+    keys,
+    sessions: combined,
+    onboarded: local.onboarded || remote.onboarded,
+    completed: [
+      ...new Set([
+        ...local.completed,
+        ...remote.completed,
+        ...combined.filter(lessonPassed).map((s) => s.lesson),
+      ]),
+    ].sort((a, b) => a - b),
+  };
+}
+export function addSession(progress: Progress, session: Session) {
+  return mergeProgress({ ...progress, sessions: [...progress.sessions, session] }, freshProgress());
+}
+export function journey(progress: Progress) {
+  const xp =
+    progress.sessions.reduce((sum, s) => sum + Math.max(5, Math.floor(s.characters / 8)), 0) +
+    progress.completed.length * 50;
+  const stages = ['Semínko', 'První klíčky', 'Mladý výhonek', 'Rozkvetlá zahrada', 'Strom jistoty'];
+  const stage = Math.min(4, Math.floor(Math.sqrt(xp / 100)));
+  return {
+    xp,
+    stage,
+    name: stages[stage],
+    next: (stage + 1) ** 2 * 100,
+    characters: progress.sessions.reduce((n, s) => n + s.characters, 0),
   };
 }
 export function recordKey(
@@ -205,7 +248,12 @@ export function parseProgress(raw: string | null): Progress {
   if (!raw) return freshProgress();
   try {
     const p = JSON.parse(raw);
-    if (p.version !== 1 || !Array.isArray(p.sessions) || !p.keys || typeof p.keys !== 'object')
+    if (
+      ![1, 2].includes(p.version) ||
+      !Array.isArray(p.sessions) ||
+      !p.keys ||
+      typeof p.keys !== 'object'
+    )
       return freshProgress();
     const settings = { ...defaults, ...p.settings };
     settings.goal = Math.max(100, Math.min(600, Number(settings.goal) || 300));
@@ -236,15 +284,23 @@ export function parseProgress(raw: string | null): Progress {
           s.accuracy <= 100 &&
           s.seconds > 0,
       )
-      .slice(-500);
+      .map((s: Session) => ({
+        ...s,
+        keyStats: cleanKeys(s.keyStats),
+        errors: Number.isInteger(s.errors) && s.errors! >= 0 ? s.errors : undefined,
+        finished: s.finished === true,
+        lessonVersion: s.lessonVersion === COURSE_VERSION ? COURSE_VERSION : 1,
+      }));
     return {
-      version: 1,
+      version: 2,
+      baselineKeys: p.version === 1 ? keys : cleanKeys(p.baselineKeys),
       settings,
       keys,
       sessions,
-      completed: Array.isArray(p.completed)
-        ? p.completed.filter((v: number) => Number.isInteger(v) && v >= 0 && v < lessons.length)
-        : [],
+      completed:
+        p.version === 2 && Array.isArray(p.completed)
+          ? p.completed.filter((v: number) => Number.isInteger(v) && v >= 0 && v < lessons.length)
+          : [],
       onboarded: !!p.onboarded,
     };
   } catch {
@@ -324,7 +380,8 @@ export function keyInfo(char: string): KeyInfo | undefined {
   if (char === ' ') return { label: 'mezerník', code: 'Space', finger: 8 };
   const digit = '1234567890'.indexOf(char);
   if (digit >= 0) return { ...rows[0][digit + 1], shift: true };
-  if (char === '*') return { ...rows[3][9], alt: true };
+  const altCodes: Record<string, string> = { '*': 'Slash', '@': 'KeyV', '[': 'KeyF', ']': 'KeyG' };
+  if (altCodes[char]) return { ...rows.flat().find((k) => k.code === altCodes[char])!, alt: true };
   if (char === 'Ů') return { ...rows[2][9], caps: true };
   if ('ďťňóĎŤŇÓĚŠČŘŽÝÁÍÉÚ'.includes(char) && char) {
     const base = char.normalize('NFD')[0];
@@ -337,6 +394,7 @@ export function keyInfo(char: string): KeyInfo | undefined {
       };
   }
   const shifted: Record<string, string> = {
+    _: 'Slash',
     '/': 'BracketLeft',
     '(': 'BracketRight',
     '%': 'Minus',

@@ -1,6 +1,6 @@
 {
   "name": "lehce",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,12 +14,14 @@
     "@fontsource/dm-mono": "^5.2.7",
     "@fontsource/lora": "^5.2.8",
     "@fontsource/manrope": "^5.2.8",
+    "@supabase/supabase-js": "^2.118.0",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
+    "@electric-sql/pglite": "^0.5.11",
     "@playwright/test": "^1.56.0",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.0",

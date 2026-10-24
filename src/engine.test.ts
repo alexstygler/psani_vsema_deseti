@@ -30,9 +30,11 @@ describe('měření a adaptivní trénink', () => {
   });
   it('nepřeskakuje v prvních lekcích na dosud nenaučené klávesy', () => {
     let learned = ' ';
-    lessons.slice(0, 7).forEach((lesson) => {
+    lessons.slice(0, 7).forEach((lesson, i) => {
       learned += lesson.keys;
-      expect([...lesson.text].every((char) => learned.includes(char))).toBe(true);
+      expect([...makeText('beginner', i, {}, 0)].every((char) => learned.includes(char))).toBe(
+        true,
+      );
     });
   });
   it('přiřazuje QWERTZ, diakritiku, Shift a AltGr ke správným fyzickým klávesám', () => {
