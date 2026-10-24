@@ -127,6 +127,7 @@ export default function App() {
     document.documentElement.dataset.motion = progress.settings.reducedMotion ? 'reduced' : 'full';
   }, [progress.settings.reducedMotion]);
   function settings(patch: Partial<Settings>) {
+    if (patch.level) setAssessment(undefined);
     setProgress((p) => ({ ...p, settings: { ...p.settings, ...patch } }));
   }
   function navigate(p: Page) {
@@ -850,6 +851,7 @@ export default function App() {
                             const parsed = parseProgress(raw);
                             if (!window.confirm('Nahradit současný pokrok touto zálohou?')) return;
                             setProgress(parsed);
+                            setAssessment(undefined);
                             setMode(parsed.settings.level === 'beginner' ? 'beginner' : 'adaptive');
                             setSeed((v) => v + 1);
                           } catch {
@@ -1061,6 +1063,7 @@ export default function App() {
                   className="primary-button danger-button"
                   onClick={() => {
                     setProgress(freshProgress());
+                    setAssessment(undefined);
                     setMode('adaptive');
                     setSeed((v) => v + 1);
                     setModal(null);

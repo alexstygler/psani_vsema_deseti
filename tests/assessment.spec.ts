@@ -23,6 +23,14 @@ test('závěrečný test zamčené lekce uzná právě tuto lekci a odemkne nás
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('lehce.progress.v1')!));
   expect(saved.completed).toEqual([19]);
   expect(saved.sessions[0].assessment).toEqual({ kind: 'exam' });
+  await page.getByRole('button', { name: 'Cesta od základů', exact: true }).click();
+  await page.getByRole('button', { name: 'Závěrečný test lekce 20:', exact: false }).click();
+  await expect(page.locator('.exam-notice')).toBeVisible();
+  await page.getByRole('button', { name: 'Nastavení', exact: true }).click();
+  await page.getByLabel('Vaše výchozí úroveň').selectOption('beginner');
+  await page.getByLabel('Vaše výchozí úroveň').selectOption('retrain');
+  await page.getByRole('button', { name: 'Procvičování', exact: true }).click();
+  await expect(page.locator('.exam-notice')).toHaveCount(0);
 });
 
 test('rozřazení uzná oblast, další neúspěch zachová pokrok a nabídne odlišný text', async ({
