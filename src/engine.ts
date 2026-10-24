@@ -1,5 +1,13 @@
 import { symbols, symbolPatterns, symbolText } from './symbols';
-import { assessmentRules, stageLessons, placementStages, type Assessment } from './assessment';
+import {
+  assessmentRules,
+  stageLessons,
+  placementStages,
+  courseSections,
+  sectionParts,
+  sectionLessons,
+  type Assessment,
+} from './assessment';
 import {
   lessons,
   lessonText,
@@ -153,9 +161,24 @@ export function lessonPassed(session: Session) {
 }
 export function passedLessons(session: Session) {
   if (!lessonPassed(session)) return [];
+  if (session.assessment?.kind === 'section') return [];
   if (session.assessment?.kind !== 'placement') return [session.lesson];
   const stage = placementStages[session.assessment.stage];
   return stage && session.lesson === stage.to ? stageLessons(session.assessment.stage) : [];
+}
+export function sectionPartPassed(sessions: Session[], section: number, part: number) {
+  const sample = sectionParts(section)[part];
+  return (
+    !!sample &&
+    sessions.some(
+      (s) =>
+        s.assessment?.kind === 'section' &&
+        s.assessment.section === section &&
+        s.assessment.part === part &&
+        s.lesson === sample.lessons.at(-1) &&
+        lessonPassed(s),
+    )
+  );
 }
 export function isSpeedPractice(session: Pick<Session, 'mode' | 'lesson'>) {
   return (
@@ -230,7 +253,16 @@ export function mergeProgress(local: Progress, remote: Progress): Progress {
     sessions: combined,
     onboarded: local.onboarded || remote.onboarded,
     completed: [
-      ...new Set([...local.completed, ...remote.completed, ...combined.flatMap(passedLessons)]),
+      ...new Set([
+        ...local.completed,
+        ...remote.completed,
+        ...combined.flatMap(passedLessons),
+        ...courseSections.flatMap((_, section) =>
+          sectionParts(section).every((_, part) => sectionPartPassed(combined, section, part))
+            ? sectionLessons(section)
+            : [],
+        ),
+      ]),
     ].sort((a, b) => a - b),
   };
 }

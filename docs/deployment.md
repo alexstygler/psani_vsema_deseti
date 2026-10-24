@@ -7,10 +7,19 @@ Web lze zveřejnit hned bez Supabase. Pro první publikování stačí krok 2: p
 ## 1. Připravte svůj Supabase projekt
 
 1. V Supabase otevřete **SQL Editor → New query**, vložte celý obsah [supabase/schema.sql](../supabase/schema.sql) a spusťte **Run**. SQL je opakovatelné a nepřepisuje existující výsledky.
-2. V **Authentication → Providers** povolte přihlášení e-mailem a heslem. Při zapnutém potvrzování e-mailu uživatel nejprve potvrdí registrační zprávu a potom se v aplikaci přihlásí. Existující účet může použít rovnou.
+2. V **Authentication → Providers** povolte přihlášení e-mailem a heslem. Při zapnutém potvrzování e-mailu uživatel nejprve potvrdí registrační zprávu; návrat na aplikaci načte přihlášení. Existující účet může použít rovnou.
 3. Z **Settings → API / API Keys** vezměte **Project URL** a **Publishable key**, případně starší klíč **anon/public**. To jsou veřejné údaje určené do prohlížeče. **Nikdy nepoužívejte service_role, sb_secret ani databázové heslo.**
 4. V **Authentication → URL Configuration** nastavte **Site URL** na `https://alexstygler.github.io/psani_vsema_deseti/` a stejnou úplnou adresu přidejte do **Redirect URLs**. Pokud hostujete jinde, nahraďte ji skutečnou adresou aplikace. Samotné `https://alexstygler.github.io/` je jiný web a vrací 404. Aplikace při registraci i opětovném odeslání potvrzení předává adresu aktuálního dokumentu a po návratu načte přihlášení z odkazu.
-5. Pokud jste měnili šablonu **Confirm signup**, ponechte odkaz `{{ .ConfirmationURL }}`. Ten nejprve ověří e-mail u Supabase a pak vrátí uživatele do aplikace. Vlastní cestu typu `/auth/confirm` tato statická aplikace nepotřebuje. Po opravě adresy si v aplikaci nechte poslat **nový potvrzovací odkaz**; již odeslané zprávy mají původní adresu. Odesílání pro veřejné registrace vyžaduje vlastní SMTP, výchozí odesílání Supabase má omezení.
+5. Pokud jste měnili šablonu **Confirm signup**, ponechte odkaz `{{ .ConfirmationURL }}`. Ten nejprve ověří e-mail u Supabase a pak vrátí uživatele do aplikace. Vlastní cestu typu `/auth/confirm` tato statická aplikace nepotřebuje. Po opravě adresy použijte nový ověřovací e-mail. Odesílání pro veřejné registrace vyžaduje vlastní SMTP, výchozí odesílání Supabase má omezení.
+
+## Když ověřovací zpráva nepřichází
+
+Registrace a přihlášení mají vždy jen jedno hlavní tlačítko. Přepnutí mezi nimi je textový odkaz pod formulářem. Po přijetí registračního požadavku se ukáže samostatný krok s adresou a tlačítkem **Nic mi nepřišlo, poslat ještě jednou**, dostupným po minutě. Odkaz, který vypršel, nebo přihlášení nepotvrzeného účtu otevře tento krok s prvním tlačítkem **Poslat ověřovací e-mail**. Nezobrazují se současně další dvě alternativní akce ve stejném formuláři.
+
+- Účet ručně založený a potvrzený v Supabase další ověřovací zprávu nepotřebuje. Použijte **Přihlásit a synchronizovat** a heslo tohoto účtu. Opakovaná registrace stejné potvrzené adresy může vrátit úspěšnou odpověď bez odeslání zprávy. Pokud Supabase vrátí obfuskovaného uživatele s prázdnými identitami, aplikace nabídne přihlášení a nehlásí odeslání.
+- Přijetí požadavku službou není důkaz doručení do schránky. Zkontrolujte adresu, spam a nastavení odesílatele. Prázdné chybové záznamy samy o sobě neprokazují doručení.
+- Výchozí odesílatel Supabase je omezený na testování a autorizované adresy. Pro registraci veřejnosti připojte vlastní odesílání v **Authentication → Email → SMTP Settings**. Vlastní doména webu není podmínkou; ověření odesílatele se řídí pravidly zvolené e-mailové služby.
+- Pokud služba odmítne požadavek, aplikace zobrazí český důvod a pod **Podrobnosti pro správce** pouze kód a HTTP stav. `over_email_send_rate_limit` / HTTP 429 znamená limit odesílání; chyba SMTP nebo `Error sending confirmation email` vyžaduje kontrolu odesílatele. Záznamy hledejte v Supabase **Authentication → Logs** a případně v záznamech použité e-mailové služby. Automatické testy používají simulované odpovědi a neověřují skutečné doručení z konkrétního projektu.
 
 ## 2. Zapněte GitHub Pages
 

@@ -8,7 +8,42 @@ import {
   MAX_ERRORS,
 } from './curriculum';
 
-export type Assessment = { kind: 'exam' } | { kind: 'placement'; stage: number };
+export type Assessment =
+  | { kind: 'exam' } // Legacy results remain valid; individual exams are no longer offered.
+  | { kind: 'placement'; stage: number }
+  | { kind: 'section'; section: number; part: number };
+
+export const courseSections = lessons.reduce<Array<{ title: string; from: number; to: number }>>(
+  (sections, l, index) => {
+    const title = l.chapter.replace(/^\d+\s*·\s*/, '');
+    const previous = sections.at(-1);
+    if (previous?.title === title) previous.to = index;
+    else sections.push({ title, from: index, to: index });
+    return sections;
+  },
+  [],
+);
+
+export function sectionLessons(section: number) {
+  const range = courseSections[section];
+  return range ? Array.from({ length: range.to - range.from + 1 }, (_, i) => range.from + i) : [];
+}
+
+export function sectionParts(section: number) {
+  const covered = sectionLessons(section);
+  // Mixed chapters use separate samples: formulas never inherit prose speed.
+  return [false, true]
+    .map((precision) => {
+      const indices = covered.filter((i) => (lessonRules(i).minCpm === 0) === precision);
+      return {
+        title: precision ? 'Znaky a přesnost' : 'Plynulé psaní',
+        lessons: indices,
+        minCpm: precision ? 0 : PASS_CPM,
+      };
+    })
+    .filter((part) => part.lessons.length)
+    .sort((a, b) => a.lessons[0] - b.lessons[0]);
+}
 export const placementStages = [
   { title: 'Základní poloha a první slova', from: 0, to: 5 },
   { title: 'Celá abeceda bez diakritiky', from: 6, to: 15 },
@@ -32,6 +67,14 @@ export function recommendedStage(completed: number[]) {
 }
 
 export function assessmentRules(assessment: Assessment | undefined, lesson: number) {
+  if (assessment?.kind === 'section') {
+    const part = sectionParts(assessment.section)[assessment.part];
+    return {
+      minCpm: part?.minCpm ?? PASS_CPM,
+      maxErrors: MAX_ERRORS,
+      timeLimit: part?.minCpm === 0 ? null : 180,
+    };
+  }
   if (assessment?.kind !== 'placement') return lessonRules(lesson);
   const covered = stageLessons(assessment.stage);
   // A stage containing only precision lessons never introduces a speed requirement.
@@ -41,6 +84,14 @@ export function assessmentRules(assessment: Assessment | undefined, lesson: numb
 
 export function placementText(stage: number, variant: number, avoid = '') {
   const covered = stageLessons(stage);
+  return coverageText(covered, variant, avoid);
+}
+
+export function sectionText(section: number, part: number, variant: number, avoid = '') {
+  return coverageText(sectionParts(section)[part]?.lessons ?? [], variant, avoid);
+}
+
+function coverageText(covered: number[], variant: number, avoid: string) {
   if (!covered.length) throw new Error('Neplatná část rozřazení.');
   // Every credited lesson contributes an actual phrase; a prose test cannot
   // silently certify Excel or a key that was never included in the sample.

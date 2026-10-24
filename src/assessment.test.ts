@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { placementStages, placementText, stageLessons, recommendedStage } from './assessment';
+import {
+  placementStages,
+  placementText,
+  stageLessons,
+  recommendedStage,
+  courseSections,
+  sectionParts,
+  sectionLessons,
+  sectionText,
+} from './assessment';
 import { lessonText, lessons, textSignature } from './curriculum';
 import {
   freshProgress,
@@ -8,6 +17,7 @@ import {
   nextLesson,
   mergeProgress,
   parseProgress,
+  sectionPartPassed,
   type Session,
 } from './engine';
 
@@ -104,6 +114,80 @@ describe('rozřazení a závěrečné testy', () => {
         expect(text).not.toBe(previous);
         previous = text;
       }
+    });
+  });
+  it('sekce přesně odpovídají osmi kapitolám a první test uzná lekce 1–6', () => {
+    expect(courseSections.map((s) => [s.from, s.to])).toEqual([
+      [0, 5],
+      [6, 11],
+      [12, 15],
+      [16, 21],
+      [22, 25],
+      [26, 29],
+      [30, 33],
+      [34, 35],
+    ]);
+    const p = addSession(
+      freshProgress(),
+      attempt({ assessment: { kind: 'section', section: 0, part: 0 } }),
+    );
+    expect(p.completed).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(sectionPartPassed(p.sessions, 0, 0)).toBe(true);
+    for (const patch of [{ errors: 4 }, { seconds: 61 }, { lesson: 4 }, { finished: false }])
+      expect(
+        addSession(
+          freshProgress(),
+          attempt({ assessment: { kind: 'section', section: 0, part: 0 }, ...patch }),
+        ).completed,
+      ).toEqual([]);
+  });
+  it('smíšená pracovní sekce uzná všechny lekce až po obou částech, i po sloučení zařízení', () => {
+    expect(sectionParts(6).map((p) => [p.lessons, p.minCpm])).toEqual([
+      [[30, 31, 33], 0],
+      [[32], 150],
+    ]);
+    const precision = addSession(
+      freshProgress(),
+      attempt({
+        id: 'symbols',
+        lesson: 33,
+        assessment: { kind: 'section', section: 6, part: 0 },
+        seconds: 1200,
+      }),
+    );
+    expect(precision.completed).toEqual([]);
+    const prose = addSession(
+      freshProgress(),
+      attempt({ id: 'prose', lesson: 32, assessment: { kind: 'section', section: 6, part: 1 } }),
+    );
+    expect(prose.completed).toEqual([]);
+    expect(mergeProgress(precision, parseProgress(JSON.stringify(prose))).completed).toEqual([
+      30, 31, 32, 33,
+    ]);
+    const slow = addSession(
+      freshProgress(),
+      attempt({
+        id: 'slow',
+        lesson: 32,
+        assessment: { kind: 'section', section: 6, part: 1 },
+        seconds: 1200,
+      }),
+    );
+    expect(mergeProgress(precision, slow).completed).toEqual([]);
+  });
+  it('souhrn každé sekce pokryje její lekce a obmění zadání při opakování', () => {
+    courseSections.forEach((_, section) => {
+      expect(
+        sectionParts(section)
+          .flatMap((p) => p.lessons)
+          .sort((a, b) => a - b),
+      ).toEqual(sectionLessons(section));
+      sectionParts(section).forEach((_, part) => {
+        const text = sectionText(section, part, 0);
+        expect(text.length).toBeGreaterThanOrEqual(115);
+        expect(text.length).toBeLessThanOrEqual(450);
+        expect(sectionText(section, part, 0, textSignature(text))).not.toBe(text);
+      });
     });
   });
 });

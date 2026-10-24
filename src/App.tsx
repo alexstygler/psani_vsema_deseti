@@ -43,6 +43,10 @@ import {
   placementText,
   recommendedStage,
   stageLessons,
+  courseSections,
+  sectionLessons,
+  sectionParts,
+  sectionText,
   type Assessment,
 } from './assessment';
 import { textSignature } from './curriculum';
@@ -52,6 +56,7 @@ import {
   lessonPassed,
   lessonUnlocked,
   nextLesson,
+  sectionPartPassed,
   COURSE_VERSION,
   lessonRules,
   isSpeedPractice,
@@ -75,7 +80,15 @@ import {
   type Settings,
 } from './engine';
 
-type Page = 'practice' | 'lessons' | 'skills' | 'progress' | 'settings' | 'account' | 'assessment';
+type Page =
+  | 'practice'
+  | 'lessons'
+  | 'skills'
+  | 'progress'
+  | 'settings'
+  | 'account'
+  | 'assessment'
+  | 'section-test';
 const modeNames: Record<Mode, string> = {
   adaptive: 'Na míru',
   beginner: 'Základy',
@@ -102,7 +115,7 @@ export default function App() {
     hasAuthCallback(window.location.href) ? 'account' : 'practice',
   );
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
-  const [assessment, setAssessment] = useState<Assessment | undefined>();
+  const [sectionTest, setSectionTest] = useState<{ section: number; part: number } | null>(null);
   const [placementStage, setPlacementStage] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>(() =>
     progress.settings.level === 'beginner' ? 'beginner' : 'adaptive',
@@ -127,7 +140,6 @@ export default function App() {
     document.documentElement.dataset.motion = progress.settings.reducedMotion ? 'reduced' : 'full';
   }, [progress.settings.reducedMotion]);
   function settings(patch: Partial<Settings>) {
-    if (patch.level) setAssessment(undefined);
     setProgress((p) => ({ ...p, settings: { ...p.settings, ...patch } }));
   }
   function navigate(p: Page) {
@@ -135,9 +147,8 @@ export default function App() {
     setMobileNav(false);
     window.scrollTo({ top: 0 });
   }
-  function start(m: Mode, l = nextLesson(progress.completed), exam: boolean | 'review' = false) {
-    if (m === 'beginner' && !exam && !lessonUnlocked(l, progress.completed)) return;
-    setAssessment(exam === true ? { kind: 'exam' } : undefined);
+  function start(m: Mode, l = nextLesson(progress.completed), review = false) {
+    if (m === 'beginner' && !review && !lessonUnlocked(l, progress.completed)) return;
     setMode(m);
     setLesson(l);
     setSeed((v) => v + 1);
@@ -147,6 +158,14 @@ export default function App() {
     setPlacementStage(stage);
     setSeed((v) => v + 1);
     navigate('assessment');
+  }
+  function beginSectionTest(section: number, selectedPart?: number) {
+    const unfinished = sectionParts(section).findIndex(
+      (_, part) => !sectionPartPassed(progress.sessions, section, part),
+    );
+    setSectionTest({ section, part: selectedPart ?? Math.max(0, unfinished) });
+    setSeed((v) => v + 1);
+    navigate('section-test');
   }
   function saveSession(session: Session, keys: Record<string, KeyStat>, complete: boolean) {
     setProgress((p) =>
@@ -380,12 +399,19 @@ export default function App() {
                     seed={seed}
                     custom={custom}
                     symbolFocus={symbolFocus}
-                    assessment={assessment}
                     progress={progress}
                     onFinish={saveSession}
                     onRestart={() => setSeed((v) => v + 1)}
                     onNext={() => start('beginner', Math.min(lessons.length - 1, lesson + 1))}
                     onSettings={settings}
+                    onSectionExam={
+                      mode === 'beginner' && courseSections.some((section) => section.to === lesson)
+                        ? () =>
+                            beginSectionTest(
+                              courseSections.findIndex((section) => section.to === lesson),
+                            )
+                        : undefined
+                    }
                   />
                   <div className="under-practice">
                     <span>
@@ -531,58 +557,102 @@ export default function App() {
                 <div>
                   <strong>Přeskočte to, co už zvládáte.</strong>
                   <p>
-                    Zvolte rozřazení, nebo rovnou závěrečný test libovolné lekce. Úspěšný test se
-                    počítá jako její dokončení.
+                    Zvolte rozřazení, nebo závěrečný test na konci celé sekce. Úspěšný test uzná
+                    všechny její lekce.
                   </p>
                 </div>
                 <button className="quiet-button" onClick={() => navigate('assessment')}>
                   Rozřadit podle úrovně <ArrowRight size={16} />
                 </button>
               </div>
-              <div className="lesson-grid">
-                {lessons.map((l, i) => (
-                  <div className="lesson-item" key={l.title}>
+              {courseSections.map((section, sectionIndex) => (
+                <section
+                  className="course-section"
+                  key={section.title}
+                  aria-labelledby={`section-${sectionIndex}`}
+                >
+                  <div className="course-section-heading">
+                    <span>{String(sectionIndex + 1).padStart(2, '0')}</span>
+                    <div>
+                      <h2 id={`section-${sectionIndex}`}>{section.title}</h2>
+                      <p>
+                        Lekce {section.from + 1}–{section.to + 1} ·{' '}
+                        {
+                          sectionLessons(sectionIndex).filter((i) => progress.completed.includes(i))
+                            .length
+                        }{' '}
+                        / {section.to - section.from + 1} dokončeno
+                      </p>
+                    </div>
+                  </div>
+                  <div className="lesson-grid">
+                    {sectionLessons(sectionIndex).map((i) => {
+                      const l = lessons[i];
+                      return (
+                        <button
+                          key={l.title}
+                          className={`lesson-card ${progress.completed.includes(i) ? 'complete' : ''}`}
+                          disabled={!lessonUnlocked(i, progress.completed)}
+                          title={
+                            !lessonUnlocked(i, progress.completed)
+                              ? 'Nejprve zvládněte předchozí lekci podle jejích podmínek.'
+                              : undefined
+                          }
+                          onClick={() => start('beginner', i)}
+                        >
+                          <div className="lesson-number">
+                            {progress.completed.includes(i) ? (
+                              <Check size={20} />
+                            ) : (
+                              String(i + 1).padStart(2, '0')
+                            )}
+                          </div>
+                          <div>
+                            <span>{l.subtitle}</span>
+                            <h3>{l.title}</h3>
+                            <p>
+                              {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'}{' '}
+                              ·{' '}
+                              {lessonUnlocked(i, progress.completed)
+                                ? `${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
+                                : 'Zatím zamčeno'}
+                            </p>
+                          </div>
+                          <ArrowRight size={18} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="section-exam-card">
+                    <GraduationCap size={26} />
+                    <div>
+                      <h3>Závěrečný test sekce {sectionIndex + 1}</h3>
+                      <p>
+                        Souhrn lekcí {section.from + 1}–{section.to + 1}. Splněním uznáte celou
+                        sekci a můžete pokračovat dál.
+                      </p>
+                      <small>
+                        {sectionParts(sectionIndex)
+                          .map(
+                            (part) =>
+                              `${part.title}: ${part.minCpm ? '150 CPM' : 'bez rychlostního limitu'}, nejvýše 3 chyby`,
+                          )
+                          .join(' · ')}
+                      </small>
+                    </div>
                     <button
-                      className={`lesson-card ${progress.completed.includes(i) ? 'complete' : ''}`}
-                      disabled={!lessonUnlocked(i, progress.completed)}
-                      title={
-                        !lessonUnlocked(i, progress.completed)
-                          ? 'Nejprve zvládněte předchozí lekci podle jejích podmínek.'
-                          : undefined
-                      }
-                      onClick={() => start('beginner', i)}
+                      className="primary-button"
+                      onClick={() => beginSectionTest(sectionIndex)}
+                      aria-label={`Závěrečný test sekce ${sectionIndex + 1}: ${section.title}`}
                     >
-                      <div className="lesson-number">
-                        {progress.completed.includes(i) ? (
-                          <Check size={20} />
-                        ) : (
-                          String(i + 1).padStart(2, '0')
-                        )}
-                      </div>
-                      <div>
-                        <span>{l.subtitle}</span>
-                        <h3>{l.title}</h3>
-                        <p>
-                          {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'} ·{' '}
-                          {lessonUnlocked(i, progress.completed)
-                            ? `${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
-                            : 'Zatím zamčeno'}
-                        </p>
-                      </div>
-                      <ArrowRight size={18} />
-                    </button>
-                    <button
-                      className="lesson-test"
-                      onClick={() => start('beginner', i, true)}
-                      aria-label={`Závěrečný test lekce ${i + 1}: ${l.title}`}
-                    >
-                      <GraduationCap size={15} />{' '}
-                      {progress.completed.includes(i) ? 'Ověřit znovu' : 'Závěrečný test'}{' '}
-                      <ArrowRight size={14} />
+                      {sectionLessons(sectionIndex).every((i) => progress.completed.includes(i))
+                        ? 'Ověřit sekci znovu'
+                        : 'Spustit test sekce'}{' '}
+                      <ArrowRight size={16} />
                     </button>
                   </div>
-                ))}
-              </div>
+                </section>
+              ))}
               <p className="footnote">
                 Další lekci odemknete opsáním celého textu s nejvýše 3 chybnými úseky. U běžného
                 psaní navíc platí 150 CPM. Čísla, znaky, vzorce a kombinace kláves procvičujete bez
@@ -591,6 +661,54 @@ export default function App() {
               </p>
             </>
           )}
+          {page === 'section-test' &&
+            sectionTest &&
+            (() => {
+              const section = courseSections[sectionTest.section];
+              const parts = sectionParts(sectionTest.section);
+              const part = parts[sectionTest.part];
+              return (
+                <>
+                  <PageHeading
+                    eyebrow={`SOUHRN LEKCÍ ${section.from + 1}–${section.to + 1}`}
+                    title={`Závěrečný test: ${section.title}`}
+                    description={
+                      parts.length > 1
+                        ? 'Test má dvě části. Znaky procvičíte bez rychlostního limitu, běžný text se 150 CPM. Celou sekci uznáme po splnění obou částí.'
+                        : 'Ověřte celou sekci najednou. Úspěch uzná všechny její lekce a odemkne pokračování.'
+                    }
+                  />
+                  <div className="placement-heading">
+                    <button className="quiet-button" onClick={() => navigate('lessons')}>
+                      <ArrowLeft size={16} /> Zpět na sekce
+                    </button>
+                    <span>
+                      Část {sectionTest.part + 1} / {parts.length} · {part.title}
+                    </span>
+                  </div>
+                  <Practice
+                    key={`section-${sectionTest.section}-${sectionTest.part}-${seed}`}
+                    mode="beginner"
+                    lesson={part.lessons.at(-1)!}
+                    seed={seed}
+                    custom=""
+                    symbolFocus=""
+                    assessment={{ kind: 'section', ...sectionTest }}
+                    progress={progress}
+                    onFinish={saveSession}
+                    onRestart={() => setSeed((v) => v + 1)}
+                    onNext={() => {
+                      if (sectionTest.part < parts.length - 1)
+                        beginSectionTest(sectionTest.section, sectionTest.part + 1);
+                      else if (section.to < lessons.length - 1) start('beginner', section.to + 1);
+                      else navigate('lessons');
+                    }}
+                    onSettings={settings}
+                    onTrain={() => start('beginner', section.from, true)}
+                  />
+                </>
+              );
+            })()}
           {page === 'assessment' && (
             <>
               <PageHeading
@@ -693,7 +811,7 @@ export default function App() {
                         'beginner',
                         stageLessons(placementStage).find((l) => !progress.completed.includes(l)) ??
                           placementStages[placementStage].from,
-                        'review',
+                        true,
                       )
                     }
                   />
@@ -851,7 +969,6 @@ export default function App() {
                             const parsed = parseProgress(raw);
                             if (!window.confirm('Nahradit současný pokrok touto zálohou?')) return;
                             setProgress(parsed);
-                            setAssessment(undefined);
                             setMode(parsed.settings.level === 'beginner' ? 'beginner' : 'adaptive');
                             setSeed((v) => v + 1);
                           } catch {
@@ -1063,7 +1180,6 @@ export default function App() {
                   className="primary-button danger-button"
                   onClick={() => {
                     setProgress(freshProgress());
-                    setAssessment(undefined);
                     setMode('adaptive');
                     setSeed((v) => v + 1);
                     setModal(null);
@@ -1178,6 +1294,7 @@ function Practice({
   onSettings,
   assessment,
   onTrain,
+  onSectionExam,
 }: {
   mode: Mode;
   lesson: number;
@@ -1191,6 +1308,7 @@ function Practice({
   onSettings: (s: Partial<Settings>) => void;
   assessment?: Assessment;
   onTrain?: () => void;
+  onSectionExam?: () => void;
 }) {
   const [target] = useState(() => {
     const previous =
@@ -1200,10 +1318,15 @@ function Practice({
         )
         .at(-1)?.textSignature ?? '';
     if (assessment?.kind === 'placement') return placementText(assessment.stage, seed, previous);
+    if (assessment?.kind === 'section')
+      return sectionText(assessment.section, assessment.part, seed, previous);
     return makeText(mode, lesson, progress.keys, seed, custom, symbolFocus, previous);
   });
   const rules = assessmentRules(assessment, lesson);
-  const canContinue = assessment?.kind === 'placement' || lesson < lessons.length - 1;
+  const canContinue =
+    assessment?.kind === 'placement' ||
+    assessment?.kind === 'section' ||
+    lesson < lessons.length - 1;
   const untimed = mode === 'symbols' || (mode === 'beginner' && rules.minCpm === 0);
   const limit = untimed
     ? Infinity
@@ -1406,7 +1529,9 @@ function Practice({
           {mode === 'beginner'
             ? assessment?.kind === 'placement'
               ? `Rozřazení ${assessment.stage + 1} · ${placementStages[assessment.stage].title}`
-              : `${assessment?.kind === 'exam' ? 'Závěrečný test' : 'Lekce'} ${lesson + 1} · ${lessons[lesson].title}`
+              : assessment?.kind === 'section'
+                ? `Test sekce ${assessment.section + 1} · ${courseSections[assessment.section].title} · část ${assessment.part + 1}`
+                : `${assessment?.kind === 'exam' ? 'Závěrečný test' : 'Lekce'} ${lesson + 1} · ${lessons[lesson].title}`
             : mode === 'adaptive'
               ? 'Vaše chvilka soustředění'
               : modeNames[mode]}
@@ -1447,7 +1572,9 @@ function Practice({
           <span>
             {assessment.kind === 'placement'
               ? `Úspěch uzná lekce ${placementStages[assessment.stage].from + 1}–${lesson + 1}.`
-              : 'Úspěšný test dokončí tuto lekci a odemkne další.'}{' '}
+              : assessment.kind === 'section'
+                ? `Test sekce: lekce ${courseSections[assessment.section].from + 1}–${courseSections[assessment.section].to + 1}. ${sectionParts(assessment.section).length > 1 ? 'Splňte obě části, aby se uznala celá sekce.' : 'Úspěch uzná celou sekci.'}`
+                : 'Úspěšný test dokončí tuto lekci a odemkne další.'}{' '}
             Celý text · nejvýše 3 chyby
             {rules.minCpm ? ' · alespoň 150 CPM' : ' · bez rychlostního limitu'}.
           </span>
@@ -1769,9 +1896,15 @@ function Practice({
               <Check size={17} />
               {assessment?.kind === 'placement'
                 ? `Oblast zvládnutá. Lekce ${placementStages[assessment.stage].from + 1}–${lesson + 1} jsou dokončené.`
-                : assessment?.kind === 'exam'
-                  ? 'Závěrečný test splněn. Lekce je dokončená a další odemčená.'
-                  : 'Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.'}
+                : assessment?.kind === 'section'
+                  ? sectionParts(assessment.section).every((_, part) =>
+                      sectionPartPassed(progress.sessions, assessment.section, part),
+                    )
+                    ? `Sekce zvládnutá. Lekce ${courseSections[assessment.section].from + 1}–${courseSections[assessment.section].to + 1} jsou dokončené. Můžete se k nim kdykoliv vrátit.`
+                    : 'Část testu splněna a uložena. Pro dokončení celé sekce splňte i zbývající část.'
+                  : assessment?.kind === 'exam'
+                    ? 'Závěrečný test splněn. Lekce je dokončená a další odemčená.'
+                    : 'Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.'}
             </p>
           )}
           {assessment?.kind === 'placement' && (
@@ -1824,13 +1957,24 @@ function Practice({
                 Procvičit tuto oblast <ArrowRight size={16} />
               </button>
             )}
+            {onSectionExam && lessonPassed(result) && (
+              <button className="quiet-button" onClick={onSectionExam}>
+                <GraduationCap size={16} /> Závěrečný test sekce
+              </button>
+            )}
             {mode === 'beginner' && lessonPassed(result) && canContinue && (
               <button className="primary-button" onClick={onNext}>
                 {assessment?.kind === 'placement'
                   ? assessment.stage < placementStages.length - 1
                     ? 'Další část rozřazení'
                     : 'Dokončit rozřazení'
-                  : 'Další lekce'}{' '}
+                  : assessment?.kind === 'section'
+                    ? assessment.part < sectionParts(assessment.section).length - 1
+                      ? 'Další část testu'
+                      : courseSections[assessment.section].to < lessons.length - 1
+                        ? 'Pokračovat další sekcí'
+                        : 'Přehled sekcí'
+                    : 'Další lekce'}{' '}
                 <ArrowRight size={16} />
               </button>
             )}
@@ -2004,7 +2148,9 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                               ? `Rozřazení · ${placementStages[s.assessment.stage]?.title ?? 'ověření'}`
                               : s.assessment?.kind === 'exam'
                                 ? `Závěrečný test · lekce ${s.lesson + 1}`
-                                : (modeNames[s.mode] ?? 'Cvičení')}
+                                : s.assessment?.kind === 'section'
+                                  ? `Test sekce · ${courseSections[s.assessment.section]?.title ?? 'ověření'} · část ${s.assessment.part + 1}`
+                                  : (modeNames[s.mode] ?? 'Cvičení')}
                         </td>
                         <td>
                           {s.mode === 'symbols' ||

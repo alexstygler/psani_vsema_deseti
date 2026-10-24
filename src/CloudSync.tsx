@@ -4,7 +4,7 @@ import { Cloud, RefreshCw, LogOut, Check, AlertCircle } from 'lucide-react';
 import { freshProgress, mergeProgress, parseProgress, type Progress } from './engine';
 import { publicCloudConfig, validPublicConfig } from './cloud-config';
 import { supabaseTransport, synchronize } from './sync';
-import { authReturnUrl, authLinkError } from './auth';
+import { authReturnUrl, authLinkError, authFailure } from './auth';
 
 const CONFIG_KEY = 'lehce.cloud.config';
 function readConfig() {
@@ -58,6 +58,13 @@ export default function CloudSync({
   const [error, setError] = useState(() => authLinkError(window.location.href));
   const [authNotice, setAuthNotice] = useState('');
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(() =>
+    authLinkError(window.location.href) ? '' : null,
+  );
+  const [mailSentAt, setMailSentAt] = useState<number | null>(null);
+  const [mailWait, setMailWait] = useState(0);
+  const [authDiagnostic, setAuthDiagnostic] = useState('');
+  const mailBusy = useRef(false);
   const [busy, setBusy] = useState(false);
   const latest = useRef(progress);
   latest.current = progress;
@@ -88,6 +95,17 @@ export default function CloudSync({
   }, [config.url, config.key]);
   useEffect(() => onAccountChange(user?.email ?? null), [user?.email, onAccountChange]);
   useEffect(() => {
+    if (mailSentAt === null) {
+      setMailWait(0);
+      return;
+    }
+    const update = () =>
+      setMailWait(Math.max(0, Math.ceil((mailSentAt + 60000 - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [mailSentAt]);
+  useEffect(() => {
     if (!client) return;
     client.auth.startAutoRefresh();
     const { data } = client.auth.onAuthStateChange((event, session) => {
@@ -112,6 +130,8 @@ export default function CloudSync({
         setProgress(next);
         latest.current = next;
         setStatus('Připraveno k synchronizaci');
+        setConfirmationEmail(null);
+        setMailSentAt(null);
         if (event === 'SIGNED_IN') setAuthNotice('Jste přihlášeni. Váš pokrok se synchronizuje.');
       } else if (oldId) {
         const guest = cached('lehce.guest.progress') ?? freshProgress();
@@ -195,10 +215,12 @@ export default function CloudSync({
     };
   }, [user?.id]);
   async function auth(kind: 'login' | 'signup') {
-    if (!client) return;
+    if (!client || mailBusy.current) return;
+    mailBusy.current = true;
     setBusy(true);
     setError('');
     setAuthNotice('');
+    setAuthDiagnostic('');
     attaching.current = attach;
     save('lehce.guest.progress', latest.current);
     try {
@@ -214,38 +236,65 @@ export default function CloudSync({
             });
       if (result.error) throw result.error;
       setPassword('');
-      if (!result.data.session) {
+      if (!result.data.session && kind === 'signup') {
         attaching.current = false;
-        setAuthNotice(
-          'Poslali jsme potvrzovací e-mail. Otevřete odkaz ve zprávě; vrátí vás sem a přihlásí. Pokud účet už máte, použijte Přihlásit.',
-        );
+        if (!result.data.user) throw new Error('Invalid signup response');
+        if (result.data.user.identities?.length === 0) {
+          save('lehce.pendingSignup', {});
+          setAuthView('login');
+          setAuthNotice(
+            'Pro tento e-mail už může existovat účet. Zkuste se přihlásit svým heslem; opakovaná registrace nemusí poslat další e-mail.',
+          );
+        } else {
+          setConfirmationEmail(email.trim().toLowerCase());
+          setMailSentAt(Date.now());
+          setAuthNotice(
+            'Požadavek na ověřovací e-mail byl přijat. Zkontrolujte doručenou poštu i spam. Doručení zprávy aplikace neumí ověřit.',
+          );
+        }
       }
     } catch (e) {
       attaching.current = false;
       if (kind === 'signup') save('lehce.pendingSignup', {});
-      setError(e instanceof Error ? e.message : 'Přihlášení se nepodařilo.');
+      const failure = authFailure(e);
+      setError(failure.message);
+      setAuthDiagnostic(
+        [failure.code, failure.status ? `HTTP ${failure.status}` : ''].filter(Boolean).join(' · '),
+      );
+      if (failure.code === 'email_not_confirmed') setConfirmationEmail(email.trim().toLowerCase());
     } finally {
       setBusy(false);
+      mailBusy.current = false;
     }
   }
   async function resendConfirmation() {
-    if (!client || !email) return;
+    if (!client || !confirmationEmail?.trim() || mailBusy.current || mailWait > 0) return;
+    mailBusy.current = true;
     setBusy(true);
     setError('');
+    setAuthNotice('');
+    setAuthDiagnostic('');
     try {
       const { error: resendError } = await client.auth.resend({
         type: 'signup',
-        email,
+        email: confirmationEmail.trim().toLowerCase(),
         options: { emailRedirectTo: authReturnUrl(window.location.href) },
       });
       if (resendError) throw resendError;
       setAuthNotice(
-        'Pokud účet čeká na potvrzení, poslali jsme nový odkaz. Použijte nejnovější zprávu.',
+        'Požadavek na nový ověřovací e-mail byl přijat. Pokud účet čeká na potvrzení, zkontrolujte poštu i spam a použijte nejnovější zprávu. Již potvrzený účet další ověřovací zprávu nedostane.',
       );
+      setMailSentAt(Date.now());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'E-mail se nepodařilo odeslat.');
+      const failure = authFailure(e);
+      setError(failure.message);
+      setAuthDiagnostic(
+        [failure.code, failure.status ? `HTTP ${failure.status}` : ''].filter(Boolean).join(' · '),
+      );
+      if (failure.status === 429 || failure.code.startsWith('over_')) setMailSentAt(Date.now());
     } finally {
       setBusy(false);
+      mailBusy.current = false;
     }
   }
   if (!visible) return null;
@@ -274,6 +323,12 @@ export default function CloudSync({
         <p className="warning" role="alert">
           {error} Vaše místní výsledky zůstaly uložené.
         </p>
+      )}
+      {error && authDiagnostic && (
+        <details className="auth-diagnostic">
+          <summary>Podrobnosti pro správce</summary>
+          <code>{authDiagnostic}</code>
+        </details>
       )}
       {!client ? (
         <form
@@ -350,6 +405,58 @@ export default function CloudSync({
             cloudovou historii.
           </p>
         </div>
+      ) : confirmationEmail !== null ? (
+        <form
+          className="cloud-form confirmation-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void resendConfirmation();
+          }}
+        >
+          <h3>{mailSentAt === null ? 'Potvrzení e-mailu' : 'Teď zkontrolujte e-mail'}</h3>
+          <p>
+            Ověřovací odkaz vás vrátí sem a přihlásí. Účet, který už je potvrzený, můžete rovnou
+            použít k přihlášení.
+          </p>
+          <label className="field-label">
+            E-mail
+            <input
+              type="email"
+              required
+              value={confirmationEmail}
+              onChange={(e) => {
+                setConfirmationEmail(e.target.value);
+                setMailSentAt(null);
+              }}
+              autoComplete="email"
+            />
+          </label>
+          <button className="primary-button" disabled={busy || mailWait > 0}>
+            {busy
+              ? 'Odesílám…'
+              : mailSentAt === null
+                ? 'Poslat ověřovací e-mail'
+                : 'Nic mi nepřišlo, poslat ještě jednou'}
+          </button>
+          {mailWait > 0 && (
+            <p className="mail-wait" role="status">
+              Znovu můžete požádat za {mailWait} s.
+            </p>
+          )}
+          <button
+            className="auth-switch text-button"
+            type="button"
+            onClick={() => {
+              setEmail(confirmationEmail);
+              setConfirmationEmail(null);
+              setAuthView('login');
+              setAuthNotice('');
+              setError('');
+            }}
+          >
+            Zpět na přihlášení
+          </button>
+        </form>
       ) : (
         <form
           className="cloud-form"
@@ -358,22 +465,7 @@ export default function CloudSync({
             void auth(authView);
           }}
         >
-          <div className="auth-tabs" role="group" aria-label="Přihlášení nebo registrace">
-            <button
-              type="button"
-              aria-pressed={authView === 'login'}
-              onClick={() => setAuthView('login')}
-            >
-              Přihlásit se
-            </button>
-            <button
-              type="button"
-              aria-pressed={authView === 'signup'}
-              onClick={() => setAuthView('signup')}
-            >
-              Vytvořit účet
-            </button>
-          </div>
+          <h3>{authView === 'signup' ? 'Vytvořit účet' : 'Přihlásit se'}</h3>
           <label className="field-label">
             E-mail
             <input
@@ -405,22 +497,26 @@ export default function CloudSync({
               {busy
                 ? 'Chvilku prosím…'
                 : authView === 'signup'
-                  ? 'Založit účet'
+                  ? 'Vytvořit účet'
                   : 'Přihlásit a synchronizovat'}
             </button>
-            <button
-              type="button"
-              className="quiet-button"
-              disabled={busy || !email}
-              onClick={() => void resendConfirmation()}
-            >
-              Poslat nový potvrzovací odkaz
-            </button>
           </div>
-          <p>
-            Heslo se odesílá přes HTTPS přímo do vašeho Supabase projektu. V kódu ani v záloze
-            pokroku ho neukládáme.
-          </p>
+          <button
+            className="text-button auth-switch"
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setAuthView(authView === 'login' ? 'signup' : 'login');
+              setAuthNotice('');
+              setError('');
+              setAuthDiagnostic('');
+            }}
+          >
+            {authView === 'login'
+              ? 'Ještě nemám účet → Vytvořit účet'
+              : 'Už mám účet → Přihlásit se'}
+          </button>
+          <p>Po přihlášení budete mít dokončené lekce i výsledky na všech svých zařízeních.</p>
         </form>
       )}
     </section>

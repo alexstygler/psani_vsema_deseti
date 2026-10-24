@@ -293,31 +293,66 @@ select {
   margin-left: auto;
   flex-shrink: 0;
 }
-.lesson-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
+.course-section {
+  margin-top: 32px;
 }
-.lesson-item .lesson-card {
-  width: 100%;
-  flex: 1;
-}
-.lesson-test {
+.course-section-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 11px 16px;
+  gap: 17px;
+  margin-bottom: 18px;
+}
+.course-section-heading > span {
+  font:
+    20px 'DM Mono',
+    monospace;
+  color: #3e5938;
+  background: #e9efdf;
+  border-radius: 12px;
+  padding: 13px;
+}
+.course-section-heading h2 {
+  font:
+    400 25px Lora,
+    serif;
+  margin-bottom: 7px;
+}
+.course-section-heading p {
+  color: #5e6e54;
   font-size: 11px;
-  text-align: left;
-  color: #36523a;
-  border-radius: 8px;
 }
-.lesson-test:hover {
-  background: #e7ecdf;
+.section-exam-card {
+  display: flex;
+  align-items: center;
+  gap: 19px;
+  padding: 23px;
+  margin-top: 13px;
+  background: #edf2e7;
+  border: 1px solid #dce5d3;
+  border-radius: 11px;
 }
-.lesson-test > svg:last-child {
+.section-exam-card > svg {
+  color: #527044;
+}
+.section-exam-card h3 {
+  font-size: 14px;
+  margin-bottom: 7px;
+}
+.section-exam-card p {
+  color: #53634f;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.section-exam-card small {
+  display: block;
+  color: #53634f;
+  font-size: 10px;
+  line-height: 1.8;
+  margin-top: 7px;
+}
+.section-exam-card > button {
   margin-left: auto;
+  flex-shrink: 0;
 }
 .placement-intro {
   display: grid;
@@ -392,24 +427,45 @@ select {
   line-height: 1.8;
   color: #39543d;
 }
-.auth-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 5px;
-  border-radius: 10px;
-  background: #eef1e8;
-  margin-bottom: 25px;
+.cloud-form > h3 {
+  font:
+    400 24px Lora,
+    serif;
+  margin: 20px 0 25px;
 }
-.auth-tabs button {
-  flex: 1;
-  padding: 11px;
-  border-radius: 7px;
-  font-size: 13px;
-  font-weight: 600;
+.auth-switch {
+  display: block;
+  margin: 22px 0;
+  text-align: left;
 }
-.auth-tabs button[aria-pressed='true'] {
-  background: #fffefa;
-  box-shadow: 0 1px 5px #263e3212;
+.cloud-form .auth-switch {
+  font-size: 12px;
+  line-height: 1.7;
+  text-decoration: underline;
+}
+.cloud-form > small {
+  display: block;
+  font-size: 11px;
+  color: #5e6e54;
+}
+.confirmation-form > p {
+  margin-bottom: 22px;
+}
+.confirmation-form .mail-wait {
+  margin-top: 12px;
+  font-size: 11px;
+}
+.auth-diagnostic {
+  font-size: 11px;
+  color: #5e6e54;
+  margin: 12px 0 25px;
+}
+.auth-diagnostic summary {
+  cursor: pointer;
+}
+.auth-diagnostic code {
+  display: block;
+  margin-top: 10px;
 }
 .auth-notice {
   padding: 15px 18px;
@@ -436,6 +492,17 @@ select {
   }
 }
 @media (max-width: 760px) {
+  .section-exam-card {
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .section-exam-card > div {
+    flex: 1;
+    min-width: 180px;
+  }
+  .section-exam-card > button {
+    margin-left: 0;
+  }
   .assessment-invite {
     flex-wrap: wrap;
     padding: 18px;
