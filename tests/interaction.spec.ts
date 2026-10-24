@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { freshProgress } from '../src/engine';
+import { finishExercise } from './course-helpers';
 
 test('souvislý překlep je jeden úsek a Enter umožní celou cestu bez myši', async ({ page }) => {
+  test.setTimeout(90000);
   await page.addInitScript((p) => localStorage.setItem('lehce.progress.v1', JSON.stringify(p)), {
     ...freshProgress(),
     settings: { ...freshProgress().settings, level: 'beginner' },
@@ -26,6 +28,12 @@ test('souvislý překlep je jeden úsek a Enter umožní celou cestu bez myši',
   await expect(page.locator('.typing-text .wrong')).toHaveCount(0);
   await input.pressSequentially(text);
   await expect(page.locator('.pass-checklist')).toContainText('Chyby 1 / 3');
+  await page.keyboard.press('Enter');
+  await finishExercise(page);
+  await page.keyboard.press('Enter');
+  await finishExercise(page);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Nové znaky: d a k', exact: true })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page.locator('.session-label')).toContainText('Lekce 2');
   await expect(input).toBeFocused();

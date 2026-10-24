@@ -1,4 +1,5 @@
 import { symbols, symbolPatterns, symbolText } from './symbols';
+import { lessons as legacyLessons, lessonRules as legacyRules } from './legacy-curriculum';
 import {
   assessmentRules,
   stageLessons,
@@ -15,6 +16,8 @@ import {
   PASS_CPM,
   MAX_ERRORS,
   lessonRules,
+  exerciseOrder,
+  type LessonExercise,
 } from './curriculum';
 export { lessons, COURSE_VERSION, PASS_CPM, MAX_ERRORS, lessonRules } from './curriculum';
 export type Mode = 'adaptive' | 'beginner' | 'text' | 'academic' | 'symbols' | 'custom' | 'skills';
@@ -38,6 +41,8 @@ export type Session = {
   accuracyMeasured?: boolean;
   assessment?: Assessment;
   textSignature?: string;
+  exercise?: LessonExercise;
+  lessonId?: string;
 };
 export type Settings = {
   level: 'retrain' | 'beginner';
@@ -49,7 +54,8 @@ export type Settings = {
   reducedMotion: boolean;
 };
 export type Progress = {
-  version: 2;
+  version: 3;
+  legacyCompleted: number[];
   baselineKeys: Record<string, KeyStat>;
   settings: Settings;
   keys: Record<string, KeyStat>;
@@ -68,7 +74,8 @@ export const defaults: Settings = {
   reducedMotion: false,
 };
 export const freshProgress = (): Progress => ({
-  version: 2,
+  version: 3,
+  legacyCompleted: [],
   baselineKeys: {},
   settings: { ...defaults },
   keys: {},
@@ -147,12 +154,14 @@ export function metrics(characters: number, attempts: number, correct: number, s
   };
 }
 export function lessonPassed(session: Session) {
-  const rules = assessmentRules(session.assessment, session.lesson);
+  const rules = session.assessment
+    ? assessmentRules(session.assessment, session.lesson)
+    : lessonRules(session.lesson, session.exercise);
   return (
     session.mode === 'beginner' &&
     session.lessonVersion === COURSE_VERSION &&
     session.finished === true &&
-    session.characters >= 100 &&
+    session.characters >= (session.exercise === 'touch' && !session.assessment ? 24 : 100) &&
     session.seconds > 0 &&
     (rules.minCpm === 0 || (session.characters / session.seconds) * 60 >= rules.minCpm) &&
     typeof session.errors === 'number' &&
@@ -162,9 +171,36 @@ export function lessonPassed(session: Session) {
 export function passedLessons(session: Session) {
   if (!lessonPassed(session)) return [];
   if (session.assessment?.kind === 'section') return [];
+  if (!session.assessment) return [];
   if (session.assessment?.kind !== 'placement') return [session.lesson];
   const stage = placementStages[session.assessment.stage];
   return stage && session.lesson === stage.to ? stageLessons(session.assessment.stage) : [];
+}
+export function exercisePassed(sessions: Session[], lesson: number, exercise: LessonExercise) {
+  return sessions.some(
+    (s) =>
+      !s.assessment &&
+      s.lesson === lesson &&
+      s.exercise === exercise &&
+      s.lessonId === lessons[lesson]?.id &&
+      lessonPassed(s),
+  );
+}
+export function migrateLegacyCompleted(completed: number[]) {
+  const known = new Set(
+    completed.flatMap((i) =>
+      legacyLessons[i]?.keys === 'Shift' ? [] : [...(legacyLessons[i]?.keys ?? '')],
+    ),
+  );
+  return lessons.flatMap((l, index) =>
+    l.keys
+      ? [...l.keys].every((key) => known.has(key))
+        ? [index]
+        : []
+      : l.legacy?.every((i) => completed.includes(i))
+        ? [index]
+        : [],
+  );
 }
 export function sectionPartPassed(sessions: Session[], section: number, part: number) {
   const sample = sectionParts(section)[part];
@@ -180,11 +216,18 @@ export function sectionPartPassed(sessions: Session[], section: number, part: nu
     )
   );
 }
-export function isSpeedPractice(session: Pick<Session, 'mode' | 'lesson'>) {
+export function isSpeedPractice(
+  session: Pick<Session, 'mode' | 'lesson'> & Partial<Pick<Session, 'lessonVersion' | 'exercise'>>,
+) {
   return (
     session.mode !== 'symbols' &&
     session.mode !== 'skills' &&
-    !(session.mode === 'beginner' && lessonRules(session.lesson).minCpm === 0)
+    !(
+      session.mode === 'beginner' &&
+      (session.exercise === 'touch' ||
+        (session.lessonVersion === 2 ? legacyRules(session.lesson) : lessonRules(session.lesson))
+          .minCpm === 0)
+    )
   );
 }
 export function lessonUnlocked(index: number, completed: number[]) {
@@ -247,7 +290,10 @@ export function mergeProgress(local: Progress, remote: Progress): Progress {
     }
   return {
     ...local,
-    version: 2,
+    version: 3,
+    legacyCompleted: [
+      ...new Set([...(local.legacyCompleted ?? []), ...(remote.legacyCompleted ?? [])]),
+    ].sort((a, b) => a - b),
     baselineKeys,
     keys,
     sessions: combined,
@@ -257,6 +303,11 @@ export function mergeProgress(local: Progress, remote: Progress): Progress {
         ...local.completed,
         ...remote.completed,
         ...combined.flatMap(passedLessons),
+        ...lessons.flatMap((_, index) =>
+          exerciseOrder.every((exercise) => exercisePassed(combined, index, exercise))
+            ? [index]
+            : [],
+        ),
         ...courseSections.flatMap((_, section) =>
           sectionParts(section).every((_, part) => sectionPartPassed(combined, section, part))
             ? sectionLessons(section)
@@ -306,7 +357,7 @@ export function parseProgress(raw: string | null): Progress {
   try {
     const p = JSON.parse(raw);
     if (
-      ![1, 2].includes(p.version) ||
+      ![1, 2, 3].includes(p.version) ||
       !Array.isArray(p.sessions) ||
       !p.keys ||
       typeof p.keys !== 'object'
@@ -346,18 +397,33 @@ export function parseProgress(raw: string | null): Progress {
         keyStats: cleanKeys(s.keyStats),
         errors: Number.isInteger(s.errors) && s.errors! >= 0 ? s.errors : undefined,
         finished: s.finished === true,
-        lessonVersion: s.lessonVersion === COURSE_VERSION ? COURSE_VERSION : 1,
+        lessonVersion: [2, COURSE_VERSION].includes(s.lessonVersion!) ? s.lessonVersion : 1,
       }));
     return {
-      version: 2,
+      version: 3,
+      legacyCompleted:
+        p.version === 3
+          ? Array.isArray(p.legacyCompleted)
+            ? p.legacyCompleted.filter(
+                (v: number) => Number.isInteger(v) && v >= 0 && v < legacyLessons.length,
+              )
+            : []
+          : p.version === 2 && Array.isArray(p.completed)
+            ? p.completed.filter(
+                (v: number) => Number.isInteger(v) && v >= 0 && v < legacyLessons.length,
+              )
+            : [],
       baselineKeys: p.version === 1 ? keys : cleanKeys(p.baselineKeys),
       settings,
       keys,
       sessions,
-      completed:
-        p.version === 2 && Array.isArray(p.completed)
+      completed: Array.isArray(p.completed)
+        ? p.version === 3
           ? p.completed.filter((v: number) => Number.isInteger(v) && v >= 0 && v < lessons.length)
-          : [],
+          : p.version === 2
+            ? migrateLegacyCompleted(p.completed)
+            : []
+        : [],
       onboarded: !!p.onboarded,
     };
   } catch {

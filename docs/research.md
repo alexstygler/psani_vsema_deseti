@@ -31,3 +31,5 @@ To je omezená rešerše dvou přímo doložených produktů, nikoliv průzkum v
 - Zda jedna minuta působí jako příjemný vstup a zda texty nejsou repetitivní.
 - Které akademické obory a konkrétní znaky má smysl doplnit.
 - Zda má další verze nabídnout hravou vizuální odměnu, nebo zachovat současný klid.
+
+Aktualizace kurzu podle fyzických řad, dvou nových znaků a tří kroků: [rešerše nového kurzu](research-course-v3.md).

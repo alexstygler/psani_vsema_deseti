@@ -36,6 +36,7 @@ import Garden from './Garden';
 import SymbolGuide from './SymbolGuide';
 import { insertCharacter, deleteBackward } from './typing';
 import EditorLab from './EditorLab';
+import LessonFlow from './LessonFlow';
 import { hasAuthCallback } from './auth';
 import {
   assessmentRules,
@@ -49,7 +50,7 @@ import {
   sectionText,
   type Assessment,
 } from './assessment';
-import { textSignature } from './curriculum';
+import { textSignature, lessonText, type LessonExercise } from './curriculum';
 import { version as appVersion } from '../package.json';
 import {
   addSession,
@@ -181,6 +182,7 @@ export default function App() {
   const weak = weakestKeys(progress.keys).filter((k) => k.errors > 0);
   const nav = [
     { id: 'practice' as Page, label: 'Procvičování', icon: Keyboard },
+    { id: 'account' as Page, label: 'Účet a synchronizace', icon: UserRound },
     { id: 'lessons' as Page, label: 'Cesta od základů', icon: BookOpen },
     { id: 'assessment' as Page, label: 'Zjistit mou úroveň', icon: GraduationCap },
     { id: 'skills' as Page, label: 'Klávesové dovednosti', icon: Command },
@@ -230,13 +232,6 @@ export default function App() {
           </span>
         </div>
         <div className="sidebar-bottom">
-          <button
-            className={`nav-item ${page === 'account' ? 'selected' : ''}`}
-            onClick={() => navigate('account')}
-          >
-            <UserRound size={18} />
-            Účet a synchronizace
-          </button>
           <button
             className={`nav-item ${page === 'settings' ? 'selected' : ''}`}
             onClick={() => navigate('settings')}
@@ -392,27 +387,65 @@ export default function App() {
                       }}
                     />
                   )}
-                  <Practice
-                    key={`${mode}-${lesson}-${seed}-${progress.settings.duration}-${symbolFocus}`}
-                    mode={mode}
-                    lesson={lesson}
-                    seed={seed}
-                    custom={custom}
-                    symbolFocus={symbolFocus}
-                    progress={progress}
-                    onFinish={saveSession}
-                    onRestart={() => setSeed((v) => v + 1)}
-                    onNext={() => start('beginner', Math.min(lessons.length - 1, lesson + 1))}
-                    onSettings={settings}
-                    onSectionExam={
-                      mode === 'beginner' && courseSections.some((section) => section.to === lesson)
-                        ? () =>
-                            beginSectionTest(
-                              courseSections.findIndex((section) => section.to === lesson),
-                            )
-                        : undefined
-                    }
-                  />
+                  {mode === 'beginner' ? (
+                    <LessonFlow
+                      key={`lesson-${lesson}-${seed}`}
+                      lesson={lesson}
+                      seed={seed}
+                      progress={progress}
+                      onDone={() =>
+                        lesson < lessons.length - 1
+                          ? start('beginner', lesson + 1)
+                          : navigate('lessons')
+                      }
+                      renderExercise={({
+                        exercise,
+                        seed: phaseSeed,
+                        onNext,
+                        onRestart,
+                        nextLabel,
+                      }) => (
+                        <Practice
+                          key={`${lesson}-${exercise}-${phaseSeed}`}
+                          mode="beginner"
+                          lesson={lesson}
+                          seed={phaseSeed}
+                          custom=""
+                          symbolFocus=""
+                          progress={progress}
+                          exercise={exercise}
+                          nextLabel={nextLabel}
+                          onFinish={saveSession}
+                          onRestart={onRestart}
+                          onNext={onNext}
+                          onSettings={settings}
+                          onSectionExam={
+                            exercise === 'sentences' &&
+                            courseSections.some((section) => section.to === lesson)
+                              ? () =>
+                                  beginSectionTest(
+                                    courseSections.findIndex((section) => section.to === lesson),
+                                  )
+                              : undefined
+                          }
+                        />
+                      )}
+                    />
+                  ) : (
+                    <Practice
+                      key={`${mode}-${lesson}-${seed}-${progress.settings.duration}-${symbolFocus}`}
+                      mode={mode}
+                      lesson={lesson}
+                      seed={seed}
+                      custom={custom}
+                      symbolFocus={symbolFocus}
+                      progress={progress}
+                      onFinish={saveSession}
+                      onRestart={() => setSeed((v) => v + 1)}
+                      onNext={() => start('beginner', Math.min(lessons.length - 1, lesson + 1))}
+                      onSettings={settings}
+                    />
+                  )}
                   <div className="under-practice">
                     <span>
                       <ShieldCheck size={15} />
@@ -552,6 +585,12 @@ export default function App() {
                   {progress.completed.length} / {lessons.length} lekcí
                 </span>
               </div>
+              {progress.legacyCompleted.length > 0 && (
+                <p className="footnote">
+                  Dřívější výsledky jsme zachovali a zvládnuté hmaty převedli do nového členění
+                  kurzu. Stará čísla lekcí proto nemusí odpovídat novým.
+                </p>
+              )}
               <div className="assessment-invite">
                 <GraduationCap size={24} />
                 <div>
@@ -611,10 +650,9 @@ export default function App() {
                             <span>{l.subtitle}</span>
                             <h3>{l.title}</h3>
                             <p>
-                              {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'}{' '}
-                              ·{' '}
+                              {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Opakování'} ·{' '}
                               {lessonUnlocked(i, progress.completed)
-                                ? `${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
+                                ? `3 cvičení · ${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
                                 : 'Zatím zamčeno'}
                             </p>
                           </div>
@@ -654,10 +692,12 @@ export default function App() {
                 </section>
               ))}
               <p className="footnote">
-                Další lekci odemknete opsáním celého textu s nejvýše 3 chybnými úseky. U běžného
-                psaní navíc platí 150 CPM. Čísla, znaky, vzorce a kombinace kláves procvičujete bez
-                požadavku na rychlost i bez časového limitu. Opakování nabízí jiný text. První hmaty
-                ještě nemohou tvořit slova; od čtvrté lekce začínají skutečná slova a později věty.
+                Každá lekce má osahání kláves a dvě navazující cvičení. Osahání je bez rychlosti.
+                Další lekci odemknete splněním všech tří kroků s nejvýše 3 chybnými úseky v každém.
+                U běžného psaní navíc platí 150 CPM. Čísla, znaky, vzorce a kombinace kláves
+                procvičujete bez požadavku na rychlost i bez časového limitu. Opakování nabízí jiný
+                text. První hmaty ještě nemohou tvořit slova; od čtvrté lekce začínají skutečná
+                slova a později věty.
               </p>
             </>
           )}
@@ -961,7 +1001,7 @@ export default function App() {
                             const raw = await file.text();
                             const p = JSON.parse(raw);
                             if (
-                              ![1, 2].includes(p.version) ||
+                              ![1, 2, 3].includes(p.version) ||
                               !Array.isArray(p.sessions) ||
                               !p.keys
                             )
@@ -1117,10 +1157,11 @@ export default function App() {
               <p>
                 <strong>Kdy se odemkne další lekce?</strong>
                 <br />
-                Celý text a nejvýše 3 chybné úseky. U běžného psaní navíc alespoň 150 CPM a limit 3
-                minuty. Čísla, znaky, Excel a kombinace kláves nemají rychlostní ani časový limit.
-                Opakování nabízí jiné pořadí slov nebo nové věty. Historie staré verze zůstává, ale
-                nový kurz má vlastní podmínky postupu.
+                Lekce má ukázku hmatů, osahání a dvě další cvičení. Osahání je bez rychlosti. U
+                dalších cvičení celý text a nejvýše 3 chybné úseky. U běžného psaní navíc alespoň
+                150 CPM a limit 3 minuty. Čísla, znaky, Excel a kombinace kláves nemají rychlostní
+                ani časový limit. Opakování nabízí jiné pořadí slov nebo nové věty. Historie staré
+                verze zůstává a zvládnuté hmaty se přenášejí do nového uspořádání.
               </p>
               <p>
                 <strong>Co znamená CPM?</strong>
@@ -1295,6 +1336,8 @@ function Practice({
   assessment,
   onTrain,
   onSectionExam,
+  exercise,
+  nextLabel,
 }: {
   mode: Mode;
   lesson: number;
@@ -1309,23 +1352,40 @@ function Practice({
   assessment?: Assessment;
   onTrain?: () => void;
   onSectionExam?: () => void;
+  exercise?: LessonExercise;
+  nextLabel?: string;
 }) {
   const [target] = useState(() => {
     const previous =
       progress.sessions
         .filter(
-          (s) => s.mode === 'beginner' && s.lesson === lesson && s.lessonVersion === COURSE_VERSION,
+          (s) =>
+            s.mode === 'beginner' &&
+            s.lesson === lesson &&
+            s.lessonVersion === COURSE_VERSION &&
+            s.exercise === exercise,
         )
         .at(-1)?.textSignature ?? '';
     if (assessment?.kind === 'placement') return placementText(assessment.stage, seed, previous);
     if (assessment?.kind === 'section')
       return sectionText(assessment.section, assessment.part, seed, previous);
-    return makeText(mode, lesson, progress.keys, seed, custom, symbolFocus, previous);
+    return mode === 'beginner' && exercise
+      ? lessonText(
+          lesson,
+          seed,
+          weakestKeys(progress.keys)
+            .filter((k) => k.errors > 0)
+            .map((k) => k.key),
+          previous,
+          exercise,
+        )
+      : makeText(mode, lesson, progress.keys, seed, custom, symbolFocus, previous);
   });
-  const rules = assessmentRules(assessment, lesson);
+  const rules = assessment ? assessmentRules(assessment, lesson) : lessonRules(lesson, exercise);
   const canContinue =
     assessment?.kind === 'placement' ||
     assessment?.kind === 'section' ||
+    !!nextLabel ||
     lesson < lessons.length - 1;
   const untimed = mode === 'symbols' || (mode === 'beginner' && rules.minCpm === 0);
   const limit = untimed
@@ -1357,7 +1417,7 @@ function Practice({
   const textViewport = useRef<HTMLDivElement>(null);
   const cursor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    if (seed > 0) input.current?.focus({ preventScroll: true });
+    if (seed > 0 || exercise) input.current?.focus({ preventScroll: true });
   }, []);
   const e = run.current;
   const elapsed = () =>
@@ -1394,6 +1454,8 @@ function Practice({
       lessonVersion: COURSE_VERSION,
       bestCombo: e.bestCombo,
       assessment,
+      exercise,
+      lessonId: mode === 'beginner' ? lessons[lesson].id : undefined,
       textSignature: mode === 'beginner' ? textSignature(target) : undefined,
     };
     onFinish(session, e.keys, e.index >= target.length);
@@ -1861,7 +1923,9 @@ function Practice({
           <h2>
             {mode === 'beginner'
               ? lessonPassed(result)
-                ? 'Další kousek zahrady odemčen!'
+                ? exercise && !progress.completed.includes(lesson)
+                  ? 'Cvičení zvládnuté.'
+                  : 'Další kousek zahrady odemčen!'
                 : 'Ještě jeden krok k jistotě.'
               : result.accuracy >= 95
                 ? 'Tohle byl dobrý rytmus.'
@@ -1904,7 +1968,9 @@ function Practice({
                     : 'Část testu splněna a uložena. Pro dokončení celé sekce splňte i zbývající část.'
                   : assessment?.kind === 'exam'
                     ? 'Závěrečný test splněn. Lekce je dokončená a další odemčená.'
-                    : 'Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.'}
+                    : exercise && !progress.completed.includes(lesson)
+                      ? 'Cvičení splněno. Pokračujte dalším krokem lekce.'
+                      : 'Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.'}
             </p>
           )}
           {assessment?.kind === 'placement' && (
@@ -1945,7 +2011,7 @@ function Practice({
             </div>
           )}
           <p className="enter-hint">
-            Enter: další lekce po splnění, jinak nový pokus. Tab: další ovládací prvek.
+            Enter: další krok po splnění, jinak nový pokus. Tab: další ovládací prvek.
           </p>
           <div className="result-actions">
             <button className="quiet-button" onClick={onRestart}>
@@ -1964,17 +2030,18 @@ function Practice({
             )}
             {mode === 'beginner' && lessonPassed(result) && canContinue && (
               <button className="primary-button" onClick={onNext}>
-                {assessment?.kind === 'placement'
-                  ? assessment.stage < placementStages.length - 1
-                    ? 'Další část rozřazení'
-                    : 'Dokončit rozřazení'
-                  : assessment?.kind === 'section'
-                    ? assessment.part < sectionParts(assessment.section).length - 1
-                      ? 'Další část testu'
-                      : courseSections[assessment.section].to < lessons.length - 1
-                        ? 'Pokračovat další sekcí'
-                        : 'Přehled sekcí'
-                    : 'Další lekce'}{' '}
+                {nextLabel ??
+                  (assessment?.kind === 'placement'
+                    ? assessment.stage < placementStages.length - 1
+                      ? 'Další část rozřazení'
+                      : 'Dokončit rozřazení'
+                    : assessment?.kind === 'section'
+                      ? assessment.part < sectionParts(assessment.section).length - 1
+                        ? 'Další část testu'
+                        : courseSections[assessment.section].to < lessons.length - 1
+                          ? 'Pokračovat další sekcí'
+                          : 'Přehled sekcí'
+                      : 'Další lekce')}{' '}
                 <ArrowRight size={16} />
               </button>
             )}
@@ -2144,21 +2211,17 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                         <td>
                           {s.mode === 'skills'
                             ? `Dovednosti · ${s.skill ?? 'editor'}`
-                            : s.assessment?.kind === 'placement'
-                              ? `Rozřazení · ${placementStages[s.assessment.stage]?.title ?? 'ověření'}`
-                              : s.assessment?.kind === 'exam'
-                                ? `Závěrečný test · lekce ${s.lesson + 1}`
-                                : s.assessment?.kind === 'section'
-                                  ? `Test sekce · ${courseSections[s.assessment.section]?.title ?? 'ověření'} · část ${s.assessment.part + 1}`
-                                  : (modeNames[s.mode] ?? 'Cvičení')}
+                            : s.mode === 'beginner' && s.lessonVersion === 2
+                              ? `Původní kurz · lekce ${s.lesson + 1}`
+                              : s.assessment?.kind === 'placement'
+                                ? `Rozřazení · ${placementStages[s.assessment.stage]?.title ?? 'ověření'}`
+                                : s.assessment?.kind === 'exam'
+                                  ? `Závěrečný test · lekce ${s.lesson + 1}`
+                                  : s.assessment?.kind === 'section'
+                                    ? `Test sekce · ${courseSections[s.assessment.section]?.title ?? 'ověření'} · část ${s.assessment.part + 1}`
+                                    : (modeNames[s.mode] ?? 'Cvičení')}
                         </td>
-                        <td>
-                          {s.mode === 'symbols' ||
-                          s.mode === 'skills' ||
-                          (s.mode === 'beginner' && lessonRules(s.lesson).minCpm === 0)
-                            ? 'Bez hodnocení rychlosti'
-                            : `${s.cpm} CPM`}
-                        </td>
+                        <td>{!isSpeedPractice(s) ? 'Bez hodnocení rychlosti' : `${s.cpm} CPM`}</td>
                         <td>
                           <span
                             className={`accuracy-badge ${s.accuracyMeasured !== false && s.accuracy < 90 ? 'needs-care' : ''}`}

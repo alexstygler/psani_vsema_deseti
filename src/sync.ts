@@ -34,7 +34,7 @@ export function supabaseTransport(client: SupabaseClient, userId: string): SyncT
             : `Cloud nelze přečíst: ${error.message}`,
         );
       if (!data) return null;
-      if (![1, 2].includes(data.payload?.version) || !Array.isArray(data.payload?.sessions))
+      if (![1, 2, 3].includes(data.payload?.version) || !Array.isArray(data.payload?.sessions))
         throw new Error('Cloud obsahuje neznámý formát. Místní data jsme zachovali.');
       return { revision: data.revision, progress: parseProgress(JSON.stringify(data.payload)) };
     },

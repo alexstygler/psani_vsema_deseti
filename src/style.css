@@ -91,6 +91,7 @@ select {
   min-height: 100vh;
 }
 .sidebar {
+  overflow-y: auto;
   position: fixed;
   inset: 0 auto 0 0;
   width: 230px;
@@ -169,7 +170,7 @@ select {
   margin-left: auto;
 }
 .sidebar-note {
-  margin: 66px 13px 20px;
+  margin: 28px 13px 20px;
   padding-top: 22px;
   border-top: 1px solid #dfe4d7;
 }
@@ -3736,5 +3737,204 @@ td {
   }
   .keyboard-heading {
     flex-wrap: wrap;
+  }
+}
+
+/* Guided course: each lesson has three saved exercises and a key introduction. */
+.lesson-stepper {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+.lesson-stepper > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: #edf1e7;
+  color: #465d3d;
+  font-size: 11px;
+  text-align: left;
+}
+.lesson-stepper > button > span {
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: #fffefa;
+}
+.lesson-stepper > button.current-step {
+  color: #fffefa;
+  background: #36543d;
+}
+.lesson-stepper > button.current-step > span {
+  background: #fffefa;
+  color: #36543d;
+}
+.lesson-stepper > button.text-button {
+  margin-left: auto;
+  background: transparent;
+  text-decoration: underline;
+}
+.lesson-step-title {
+  padding: 4px 2px 16px;
+}
+.lesson-step-title > span {
+  font-size: 13px;
+  font-weight: 700;
+}
+.lesson-step-title p {
+  color: #5e6e54;
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 7px;
+}
+.key-intro {
+  padding: 28px;
+}
+.key-intro-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+.key-intro-heading h2 {
+  margin: 8px 0 0;
+  font:
+    400 25px Lora,
+    serif;
+}
+.key-intro > p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #50634b;
+}
+.new-key-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 22px 0 12px;
+}
+.new-key-cards > div {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border: 1px solid #dfe6d6;
+  border-radius: 12px;
+  padding: 18px;
+  background: #f4f6ef;
+}
+.new-key-cards kbd {
+  font:
+    26px 'DM Mono',
+    monospace;
+  color: #36543d;
+  background: #e3edda;
+  border-radius: 9px;
+  min-width: 49px;
+  text-align: center;
+  padding: 10px;
+}
+.new-key-cards strong {
+  display: block;
+  font-size: 12px;
+}
+.new-key-cards span {
+  display: block;
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 5px;
+  color: #5e6e54;
+}
+.new-key-cards .key-tried {
+  border-color: #557c44;
+  background: #edf3e7;
+}
+.new-key-cards .key-tried > svg {
+  margin-left: auto;
+  color: #3c6542;
+}
+.intro-keyboard {
+  display: block;
+  width: 100%;
+  max-width: 740px;
+  margin: 0 auto 18px;
+  overflow: visible;
+}
+.intro-keyboard rect {
+  fill: #f3f5ef;
+  stroke: #dfe5d7;
+}
+.intro-keyboard text {
+  fill: #53634c;
+  font:
+    12px 'DM Mono',
+    monospace;
+}
+.intro-keyboard line {
+  stroke: #53634c;
+  stroke-width: 2;
+}
+.intro-keyboard .home-position rect {
+  fill: #eaf0e2;
+}
+.intro-keyboard .new-key rect {
+  fill: #c8dda8;
+  stroke: #3c6542;
+  stroke-width: 2;
+}
+.intro-keyboard .new-key text {
+  fill: #243e28;
+  font-weight: 700;
+}
+.intro-keyboard .intro-layout-label {
+  font-size: 10px;
+}
+.key-intro .intro-note {
+  border-left: 3px solid #b9ce9d;
+  padding: 12px 17px;
+  background: #f3f6ed;
+  margin-bottom: 22px;
+  font-size: 12px;
+}
+.try-keys {
+  max-width: 500px;
+  margin: 20px 0;
+}
+.try-keys small {
+  font-size: 11px;
+  color: #5e6e54;
+  line-height: 1.8;
+}
+@media (max-height: 760px) {
+  .sidebar-note {
+    display: none;
+  }
+  .brand-caption {
+    margin-bottom: 22px;
+  }
+}
+@media (max-width: 760px) {
+  .new-key-cards {
+    grid-template-columns: 1fr;
+  }
+  .key-intro {
+    padding: 20px 16px;
+  }
+  .lesson-stepper > button {
+    flex: 1;
+    min-width: 120px;
+  }
+  .lesson-stepper > button.text-button {
+    flex-basis: 100%;
+    margin: 0;
+    padding-left: 0;
+  }
+  .key-intro-heading h2 {
+    font-size: 21px;
   }
 }

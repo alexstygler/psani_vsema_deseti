@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { beginExercise, finishExercise } from './course-helpers';
 
 test('začátečník dokončí lekci, chyby se zaznamenají a pokrok přežije obnovení', async ({
   page,
@@ -10,6 +11,11 @@ test('začátečník dokončí lekci, chyby se zaznamenají a pokrok přežije o
   await page.getByRole('button', { name: 'Vybrat svou cestu' }).click();
   await page.getByRole('button', { name: 'Začínám od nuly' }).click();
   await page.getByRole('button', { name: 'Najít základní polohu' }).click();
+  await beginExercise(page);
+  await finishExercise(page);
+  await page.keyboard.press('Enter');
+  await finishExercise(page);
+  await page.keyboard.press('Enter');
   const target = await page.locator('.typing-text').textContent();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
   await page.getByRole('textbox', { name: 'Psací pole' }).focus();
@@ -20,10 +26,10 @@ test('začátečník dokončí lekci, chyby se zaznamenají a pokrok přežije o
   await expect(page.getByRole('status')).toContainText('Lekce zvládnutá');
   await expect(page.locator('.result-stats')).toContainText('99 %');
   await page.getByRole('button', { name: 'Můj pokrok', exact: true }).click();
-  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('tbody tr')).toHaveCount(3);
   await page.reload();
   await page.getByRole('button', { name: 'Můj pokrok', exact: true }).click();
-  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('tbody tr')).toHaveCount(3);
   await page.getByRole('button', { name: 'Cesta od základů', exact: true }).click();
   await expect(page.locator('.lesson-card.complete')).toHaveCount(1);
   expect(errors).toEqual([]);

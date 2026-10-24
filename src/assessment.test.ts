@@ -9,7 +9,7 @@ import {
   sectionLessons,
   sectionText,
 } from './assessment';
-import { lessonText, lessons, textSignature } from './curriculum';
+import { lessonText, lessons, textSignature, COURSE_VERSION } from './curriculum';
 import {
   freshProgress,
   addSession,
@@ -30,7 +30,7 @@ const attempt = (patch: Partial<Session> = {}): Session => ({
   characters: 150,
   mode: 'beginner',
   lesson: 5,
-  lessonVersion: 2,
+  lessonVersion: COURSE_VERSION,
   finished: true,
   errors: 3,
   device: 'notebook',
@@ -65,7 +65,7 @@ describe('rozřazení a závěrečné testy', () => {
     );
   });
   it('znaky, Excel a citace splní i velmi pomalý člověk; akademický text vyžaduje 150 CPM', () => {
-    for (const stage of [4, 6]) {
+    for (const stage of [6, 7, 8, 9]) {
       const s = attempt({
         lesson: placementStages[stage].to,
         assessment: { kind: 'placement', stage },
@@ -76,7 +76,11 @@ describe('rozřazení a závěrečné testy', () => {
     }
     expect(
       lessonPassed(
-        attempt({ lesson: 32, assessment: { kind: 'placement', stage: 5 }, seconds: 61 }),
+        attempt({
+          lesson: placementStages[10].to,
+          assessment: { kind: 'placement', stage: 10 },
+          seconds: 61,
+        }),
       ),
     ).toBe(false);
   });
@@ -86,7 +90,7 @@ describe('rozřazení a závěrečné testy', () => {
     ).toEqual([20]);
     expect(nextLesson([20])).toBe(21);
     expect(nextLesson([])).toBe(0);
-    expect(nextLesson(lessons.map((_, i) => i))).toBe(35);
+    expect(nextLesson(lessons.map((_, i) => i))).toBe(lessons.length - 1);
   });
   it('rozřazení pokrývá všechny lekce a skutečně obsahuje jejich nové základní klávesy', () => {
     expect(placementStages.flatMap((_, i) => stageLessons(i))).toEqual(lessons.map((_, i) => i));
@@ -116,16 +120,19 @@ describe('rozřazení a závěrečné testy', () => {
       }
     });
   });
-  it('sekce přesně odpovídají osmi kapitolám a první test uzná lekce 1–6', () => {
+  it('sekce odpovídají řadám a postupným kapitolám, první test uzná lekce 1–6', () => {
     expect(courseSections.map((s) => [s.from, s.to])).toEqual([
       [0, 5],
       [6, 11],
-      [12, 15],
-      [16, 21],
-      [22, 25],
-      [26, 29],
-      [30, 33],
-      [34, 35],
+      [12, 16],
+      [17, 24],
+      [25, 37],
+      [38, 45],
+      [46, 48],
+      [49, 53],
+      [54, 62],
+      [63, 64],
+      [65, 66],
     ]);
     const p = addSession(
       freshProgress(),
@@ -141,39 +148,25 @@ describe('rozřazení a závěrečné testy', () => {
         ).completed,
       ).toEqual([]);
   });
-  it('smíšená pracovní sekce uzná všechny lekce až po obou částech, i po sloučení zařízení', () => {
-    expect(sectionParts(6).map((p) => [p.lessons, p.minCpm])).toEqual([
-      [[30, 31, 33], 0],
-      [[32], 150],
-    ]);
-    const precision = addSession(
-      freshProgress(),
-      attempt({
-        id: 'symbols',
-        lesson: 33,
-        assessment: { kind: 'section', section: 6, part: 0 },
+  it('Excel a znaménka nemají rychlostní limit, ale závěrečný český text ho má', () => {
+    for (const section of [6, 7, 8, 9]) {
+      expect(sectionParts(section)).toHaveLength(1);
+      const session = attempt({
+        lesson: courseSections[section].to,
+        assessment: { kind: 'section', section, part: 0 },
         seconds: 1200,
-      }),
-    );
-    expect(precision.completed).toEqual([]);
-    const prose = addSession(
-      freshProgress(),
-      attempt({ id: 'prose', lesson: 32, assessment: { kind: 'section', section: 6, part: 1 } }),
-    );
-    expect(prose.completed).toEqual([]);
-    expect(mergeProgress(precision, parseProgress(JSON.stringify(prose))).completed).toEqual([
-      30, 31, 32, 33,
-    ]);
-    const slow = addSession(
-      freshProgress(),
-      attempt({
-        id: 'slow',
-        lesson: 32,
-        assessment: { kind: 'section', section: 6, part: 1 },
-        seconds: 1200,
-      }),
-    );
-    expect(mergeProgress(precision, slow).completed).toEqual([]);
+      });
+      expect(lessonPassed(session)).toBe(true);
+      expect(addSession(freshProgress(), session).completed).toEqual(sectionLessons(section));
+      const b = parseProgress(JSON.stringify(addSession(freshProgress(), session)));
+      expect(mergeProgress(freshProgress(), b).completed).toEqual(sectionLessons(section));
+    }
+    const slow = attempt({
+      lesson: courseSections[10].to,
+      assessment: { kind: 'section', section: 10, part: 0 },
+      seconds: 1200,
+    });
+    expect(addSession(freshProgress(), slow).completed).toEqual([]);
   });
   it('souhrn každé sekce pokryje její lekce a obmění zadání při opakování', () => {
     courseSections.forEach((_, section) => {

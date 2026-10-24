@@ -1,16 +1,31 @@
 import { test, expect } from '@playwright/test';
 import { freshProgress } from '../src/engine';
+import { lessons } from '../src/curriculum';
+import { beginExercise, finishExercise } from './course-helpers';
 test('Excel po deseti minutách bez rychlosti odemkne další lekci', async ({ page }) => {
   test.setTimeout(60000);
   await page.clock.install({ time: new Date('2026-10-24T12:00:00Z') });
   await page.clock.pauseAt(new Date('2026-10-24T12:01:00Z'));
   await page.addInitScript(
     (progress) => localStorage.setItem('lehce.progress.v1', JSON.stringify(progress)),
-    { ...freshProgress(), completed: Array.from({ length: 30 }, (_, i) => i), onboarded: true },
+    {
+      ...freshProgress(),
+      completed: Array.from(
+        { length: lessons.findIndex((l) => l.id === 'excel-sum') },
+        (_, i) => i,
+      ),
+      onboarded: true,
+    },
   );
   await page.goto('/');
   await page.getByRole('button', { name: 'Cesta od základů', exact: true }).click();
-  await page.locator('.lesson-card').nth(30).click();
+  await page
+    .locator('.lesson-card')
+    .nth(lessons.findIndex((l) => l.id === 'excel-sum'))
+    .click();
+  await beginExercise(page);
+  await finishExercise(page);
+  await page.keyboard.press('Enter');
   await expect(page.locator('.untimed-badge')).toContainText('Bez časového limitu');
   const text = (await page.locator('.typing-text').textContent())!;
   expect(text).toContain('SUM(');
@@ -23,8 +38,13 @@ test('Excel po deseti minutách bez rychlosti odemkne další lekci', async ({ p
   await input.pressSequentially(text.slice(1));
   await expect(page.locator('.pass-checklist')).toContainText('Rychlost se nehodnotí');
   await expect(page.locator('.pass-checklist')).toContainText('Chyby 0 / 3');
-  await page.getByRole('button', { name: 'Další lekce', exact: true }).click();
-  await expect(page.locator('.session-label')).toContainText('Lekce 32');
+  await page.keyboard.press('Enter');
+  await finishExercise(page);
+  await page.getByRole('button', { name: 'Dokončit lekci a pokračovat', exact: true }).click();
+  await beginExercise(page);
+  await expect(page.locator('.session-label')).toContainText(
+    `Lekce ${lessons.findIndex((l) => l.id === 'excel-if') + 1}`,
+  );
 });
 
 test('tahák zaměří znak a zvýrazní Ctrl i Alt, bez numerického bloku', async ({ page }) => {

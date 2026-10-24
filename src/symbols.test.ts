@@ -7,17 +7,17 @@ import {
   isSpeedPractice,
   type Session,
 } from './engine';
-import { lessonText, lessons } from './curriculum';
+import { lessonText, lessons, COURSE_VERSION } from './curriculum';
 import { symbols, symbolPatterns } from './symbols';
 it('čísla, znaky a Excel nevyžadují rychlost ani časový limit', () => {
-  for (const lesson of [26, 27, 28, 29, 30, 31, 33]) {
+  for (const lesson of lessons.flatMap((l, index) => (l.precision ? [index] : []))) {
     expect(lessonRules(lesson)).toMatchObject({ minCpm: 0, timeLimit: null });
     const session: Session = {
       id: 'precision',
       date: '2026-10-24T12:00:00Z',
       mode: 'beginner',
       lesson,
-      lessonVersion: 2,
+      lessonVersion: COURSE_VERSION,
       finished: true,
       characters: 150,
       seconds: 1800,
@@ -30,7 +30,9 @@ it('čísla, znaky a Excel nevyžadují rychlost ani časový limit', () => {
     expect(lessonPassed({ ...session, errors: 4 })).toBe(false);
   }
   expect(lessonRules(0)).toMatchObject({ minCpm: 150, timeLimit: 180 });
-  expect(isSpeedPractice({ mode: 'beginner', lesson: 30 })).toBe(false);
+  expect(
+    isSpeedPractice({ mode: 'beginner', lesson: lessons.findIndex((l) => l.id === 'excel-sum') }),
+  ).toBe(false);
   expect(isSpeedPractice({ mode: 'symbols', lesson: 0 })).toBe(false);
   expect(isSpeedPractice({ mode: 'beginner', lesson: 0 })).toBe(true);
 });

@@ -31,11 +31,17 @@ Pokud nebyl změněn název repozitáře ani vlastní doména, očekávaná adre
 
 ## 3. Připojte zařízení
 
-Otevřete stejnou veřejnou adresu na obou zařízeních. Přes výrazné tlačítko **Přihlásit / Vytvořit účet** v horní liště otevřete stránku účtu (po přihlášení **Můj účet**). Přihlaste se ke stejnému e-mailu. Při prvním přihlášení můžete výslovně přenést aktuální místní pokrok do účtu. Při registraci se tato volba zachová i do potvrzení e-mailu ve stejném prohlížeči. Účty mají oddělené místní cache a databáze povoluje přístup jen k řádku přihlášeného uživatele. Přihlášení je dál dostupné také v Nastavení.
+Otevřete stejnou veřejnou adresu na obou zařízeních. Přes výrazné tlačítko **Přihlásit / Vytvořit účet** v horní liště otevřete stránku účtu (po přihlášení **Můj účet**). Přihlaste se ke stejnému e-mailu. Při prvním přihlášení můžete výslovně přenést aktuální místní pokrok do účtu. Při registraci se tato volba zachová i do potvrzení e-mailu ve stejném prohlížeči. Účty mají oddělené místní cache a databáze povoluje přístup jen k řádku přihlášeného uživatele. Účet je také druhou položkou levé navigace, přímo pod Procvičováním, a zůstává dostupný v Nastavení.
 
 Pokud jste veřejné údaje nenastavili při sestavení, můžete je zadat v Nastavení na každém zařízení ručně. To funguje také v samostatném `lehce.html`; pro synchronizaci samozřejmě potřebujete připojení k internetu. Web na jedné adrese je praktičtější kvůli stálému úložišti a aktualizacím.
 
 Po dokončení cvičení proběhne synchronizace, dále při návratu do okna a každých 20 sekund. Přenášejí se také závěrečné testy a rozřazení včetně uznaných lekcí. Při výpadku se cvičí lokálně. Po připojení se nové výsledky sloučí podle jedinečných ID; kontrola revize řeší souběžné zápisy bez přepsání druhého zařízení. Klávesnice a ostatní nastavení zůstávají místní pro každé zařízení. Rozepsané cvičení se nepřenáší.
+
+## Aktualizace kurzu 0.6
+
+Kurz má nyní 67 lekcí v 11 sekcích a každá lekce tři ukládané kroky. Formát pokroku se automaticky převádí z verze 2 na verzi 3. Historie zůstává a dokončení se mapuje podle naučených znaků, protože pořadí lekcí se změnilo. Není potřeba spouštět nové SQL ani měnit přihlášení či nastavení Supabase.
+
+Po vydání obnovte stránku na všech zařízeních. Starý klient formát 3 odmítne a nepřepíše ho; synchronizace se obnoví po načtení nové aplikace. Pro jistotu lze před aktualizací exportovat JSON zálohu v Nastavení. Nový klient umí načíst i starší zálohy.
 
 ## Data a údržba
 

@@ -8,7 +8,7 @@ import {
   lessonUnlocked,
   type Session,
 } from './engine';
-import { lessonText, lessons } from './curriculum';
+import { lessonText, lessons, COURSE_VERSION } from './curriculum';
 import { synchronize, type Snapshot, type SyncTransport } from './sync';
 const session = (id: string, patch: Partial<Session> = {}): Session => ({
   id,
@@ -19,7 +19,8 @@ const session = (id: string, patch: Partial<Session> = {}): Session => ({
   characters: 150,
   mode: 'beginner',
   lesson: 0,
-  lessonVersion: 2,
+  lessonVersion: COURSE_VERSION,
+  assessment: { kind: 'exam' },
   finished: true,
   errors: 3,
   device: 'notebook',
@@ -40,8 +41,8 @@ describe('postup kurzem', () => {
     expect(lessonUnlocked(1, [])).toBe(false);
     expect(lessonUnlocked(1, [0])).toBe(true);
   });
-  it('má 36 lekcí s dostatečně dlouhými odlišnými variantami', () => {
-    expect(lessons).toHaveLength(36);
+  it('má rozšířený kurz s dostatečně dlouhými odlišnými variantami', () => {
+    expect(lessons.length).toBeGreaterThan(36);
     lessons.forEach((_, index) => {
       const a = lessonText(index, 0);
       const b = lessonText(index, 1);

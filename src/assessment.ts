@@ -44,16 +44,7 @@ export function sectionParts(section: number) {
     .filter((part) => part.lessons.length)
     .sort((a, b) => a.lessons[0] - b.lessons[0]);
 }
-export const placementStages = [
-  { title: 'Základní poloha a první slova', from: 0, to: 5 },
-  { title: 'Celá abeceda bez diakritiky', from: 6, to: 15 },
-  { title: 'Česká písmena a plynulost', from: 16, to: 22 },
-  { title: 'Velká písmena a interpunkce', from: 23, to: 25 },
-  { title: 'Čísla, znaky a Excel', from: 26, to: 31 },
-  { title: 'Akademický text', from: 32, to: 32 },
-  { title: 'Citace a poznámky', from: 33, to: 33 },
-  { title: 'Jistota v běžném psaní', from: 34, to: 35 },
-];
+export const placementStages = courseSections.map((section) => ({ ...section }));
 
 export function stageLessons(stage: number) {
   const range = placementStages[stage];
@@ -97,14 +88,21 @@ function coverageText(covered: number[], variant: number, avoid: string) {
   // silently certify Excel or a key that was never included in the sample.
   for (let retry = 0; retry < 40; retry++) {
     const parts = covered.map((index, offset) => {
-      const pool = lessonPool(index);
+      const keys = lessons[index].keys;
+      const budget = Math.max(12, Math.floor(320 / covered.length) - 4);
+      const relevant = (values: string[]) =>
+        values.filter((p) => !keys || [...keys].some((key) => p.includes(key)));
+      const phrases = relevant(lessonPool(index)).filter((p) => p.length <= budget);
+      const pool = phrases.length ? phrases : relevant(lessonPool(index, 'words'));
       const choice = Math.abs(variant + retry + offset) % pool.length;
       const first = pool[choice];
-      let sample = first.length < 12 ? `${first} ${pool[(choice + 1) % pool.length]}` : first;
-      if (index < 23)
+      let sample = first;
+      if (lessons[index].keys)
         for (const key of lessons[index].keys) {
           if (sample.includes(key)) continue;
-          const word = [...pool, ...lessons[index].words].find((part) => part.includes(key));
+          const word = lessonPool(index, 'words')
+            .filter((part) => part.includes(key))
+            .sort((a, b) => a.length - b.length)[0];
           sample += ` ${word ?? key}`;
         }
       return sample;
