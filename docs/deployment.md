@@ -9,7 +9,8 @@ Web lze zveřejnit hned bez Supabase. Pro první publikování stačí krok 2: p
 1. V Supabase otevřete **SQL Editor → New query**, vložte celý obsah [supabase/schema.sql](../supabase/schema.sql) a spusťte **Run**. SQL je opakovatelné a nepřepisuje existující výsledky.
 2. V **Authentication → Providers** povolte přihlášení e-mailem a heslem. Při zapnutém potvrzování e-mailu uživatel nejprve potvrdí registrační zprávu a potom se v aplikaci přihlásí. Existující účet může použít rovnou.
 3. Z **Settings → API / API Keys** vezměte **Project URL** a **Publishable key**, případně starší klíč **anon/public**. To jsou veřejné údaje určené do prohlížeče. **Nikdy nepoužívejte service_role, sb_secret ani databázové heslo.**
-4. Pro veřejný web nastavte v **Authentication → URL Configuration** svou skutečnou adresu webu jako Site URL. Aplikace používá e-mail a heslo, nikoliv OAuth přesměrování.
+4. V **Authentication → URL Configuration** nastavte **Site URL** na `https://alexstygler.github.io/psani_vsema_deseti/` a stejnou úplnou adresu přidejte do **Redirect URLs**. Pokud hostujete jinde, nahraďte ji skutečnou adresou aplikace. Samotné `https://alexstygler.github.io/` je jiný web a vrací 404. Aplikace při registraci i opětovném odeslání potvrzení předává adresu aktuálního dokumentu a po návratu načte přihlášení z odkazu.
+5. Pokud jste měnili šablonu **Confirm signup**, ponechte odkaz `{{ .ConfirmationURL }}`. Ten nejprve ověří e-mail u Supabase a pak vrátí uživatele do aplikace. Vlastní cestu typu `/auth/confirm` tato statická aplikace nepotřebuje. Po opravě adresy si v aplikaci nechte poslat **nový potvrzovací odkaz**; již odeslané zprávy mají původní adresu. Odesílání pro veřejné registrace vyžaduje vlastní SMTP, výchozí odesílání Supabase má omezení.
 
 ## 2. Zapněte GitHub Pages
 
@@ -21,11 +22,11 @@ Pokud nebyl změněn název repozitáře ani vlastní doména, očekávaná adre
 
 ## 3. Připojte zařízení
 
-Otevřete stejnou veřejnou adresu na obou zařízeních. V **Nastavení → Stejná zahrada. Na každém zařízení.** se přihlaste ke stejnému e-mailu. Při prvním přihlášení můžete výslovně přenést aktuální místní pokrok do účtu. Účty mají oddělené místní cache a databáze povoluje přístup jen k řádku přihlášeného uživatele.
+Otevřete stejnou veřejnou adresu na obou zařízeních. Přes výrazné tlačítko **Přihlásit / Vytvořit účet** v horní liště otevřete stránku účtu (po přihlášení **Můj účet**). Přihlaste se ke stejnému e-mailu. Při prvním přihlášení můžete výslovně přenést aktuální místní pokrok do účtu. Při registraci se tato volba zachová i do potvrzení e-mailu ve stejném prohlížeči. Účty mají oddělené místní cache a databáze povoluje přístup jen k řádku přihlášeného uživatele. Přihlášení je dál dostupné také v Nastavení.
 
 Pokud jste veřejné údaje nenastavili při sestavení, můžete je zadat v Nastavení na každém zařízení ručně. To funguje také v samostatném `lehce.html`; pro synchronizaci samozřejmě potřebujete připojení k internetu. Web na jedné adrese je praktičtější kvůli stálému úložišti a aktualizacím.
 
-Po dokončení cvičení proběhne synchronizace, dále při návratu do okna a každých 20 sekund. Při výpadku se cvičí lokálně. Po připojení se nové výsledky sloučí podle jedinečných ID; kontrola revize řeší souběžné zápisy bez přepsání druhého zařízení. Klávesnice a ostatní nastavení zůstávají místní pro každé zařízení. Rozepsané cvičení se nepřenáší.
+Po dokončení cvičení proběhne synchronizace, dále při návratu do okna a každých 20 sekund. Přenášejí se také závěrečné testy a rozřazení včetně uznaných lekcí. Při výpadku se cvičí lokálně. Po připojení se nové výsledky sloučí podle jedinečných ID; kontrola revize řeší souběžné zápisy bez přepsání druhého zařízení. Klávesnice a ostatní nastavení zůstávají místní pro každé zařízení. Rozepsané cvičení se nepřenáší.
 
 ## Data a údržba
 

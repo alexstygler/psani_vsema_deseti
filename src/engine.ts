@@ -1,4 +1,5 @@
 import { symbols, symbolPatterns, symbolText } from './symbols';
+import { assessmentRules, stageLessons, placementStages, type Assessment } from './assessment';
 import {
   lessons,
   lessonText,
@@ -27,6 +28,8 @@ export type Session = {
   bestCombo?: number;
   skill?: string;
   accuracyMeasured?: boolean;
+  assessment?: Assessment;
+  textSignature?: string;
 };
 export type Settings = {
   level: 'retrain' | 'beginner';
@@ -103,6 +106,7 @@ export function makeText(
   seed = 0,
   custom = '',
   symbolFocus = '',
+  avoid = '',
 ) {
   if (mode === 'symbols' && symbolFocus) return symbolText(symbolFocus, seed);
   if (mode === 'custom') return custom.normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 3000);
@@ -113,6 +117,7 @@ export function makeText(
       weakestKeys(keys)
         .filter((k) => k.errors > 0)
         .map((k) => k.key),
+      avoid,
     );
   const source = [
     ...(mode === 'symbols' ? symbolPatterns : sentences[mode === 'academic' ? 'academic' : 'text']),
@@ -134,16 +139,23 @@ export function metrics(characters: number, attempts: number, correct: number, s
   };
 }
 export function lessonPassed(session: Session) {
+  const rules = assessmentRules(session.assessment, session.lesson);
   return (
     session.mode === 'beginner' &&
     session.lessonVersion === COURSE_VERSION &&
     session.finished === true &&
     session.characters >= 100 &&
-    (lessonRules(session.lesson).minCpm === 0 ||
-      (session.characters / session.seconds) * 60 >= lessonRules(session.lesson).minCpm) &&
+    session.seconds > 0 &&
+    (rules.minCpm === 0 || (session.characters / session.seconds) * 60 >= rules.minCpm) &&
     typeof session.errors === 'number' &&
     session.errors <= MAX_ERRORS
   );
+}
+export function passedLessons(session: Session) {
+  if (!lessonPassed(session)) return [];
+  if (session.assessment?.kind !== 'placement') return [session.lesson];
+  const stage = placementStages[session.assessment.stage];
+  return stage && session.lesson === stage.to ? stageLessons(session.assessment.stage) : [];
 }
 export function isSpeedPractice(session: Pick<Session, 'mode' | 'lesson'>) {
   return (
@@ -156,10 +168,13 @@ export function lessonUnlocked(index: number, completed: number[]) {
   return index === 0 || completed.includes(index) || completed.includes(index - 1);
 }
 export function nextLesson(completed: number[]) {
-  return Math.max(
-    0,
-    lessons.findIndex((_, i) => !completed.includes(i)),
+  // A successful exam establishes a new starting point even when earlier
+  // optional lessons were skipped. They remain available in the course list.
+  const last = Math.max(
+    -1,
+    ...completed.filter((i) => Number.isInteger(i) && i >= 0 && i < lessons.length),
   );
+  return Math.min(lessons.length - 1, last + 1);
 }
 export function cleanKeys(value: unknown): Record<string, KeyStat> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -215,11 +230,7 @@ export function mergeProgress(local: Progress, remote: Progress): Progress {
     sessions: combined,
     onboarded: local.onboarded || remote.onboarded,
     completed: [
-      ...new Set([
-        ...local.completed,
-        ...remote.completed,
-        ...combined.filter(lessonPassed).map((s) => s.lesson),
-      ]),
+      ...new Set([...local.completed, ...remote.completed, ...combined.flatMap(passedLessons)]),
     ].sort((a, b) => a - b),
   };
 }

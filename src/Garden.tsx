@@ -56,9 +56,11 @@ export default function Garden({
         </div>
       </div>
       <button className="primary-button" onClick={onContinue}>
-        {progress.completed.length
-          ? `Pokračovat · ${nextLesson(progress.completed) + 1}. lekce`
-          : 'Zasadit první semínko'}
+        {progress.completed.length === lessons.length
+          ? 'Znovu závěrečná lekce'
+          : progress.completed.length
+            ? `Pokračovat · ${nextLesson(progress.completed) + 1}. lekce`
+            : 'Zasadit první semínko'}
         <ArrowRight size={16} />
       </button>
     </section>

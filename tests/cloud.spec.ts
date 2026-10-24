@@ -97,6 +97,18 @@ test('dva prohlížeče sdílejí historii přes přihlášení a revize', async
       await page.getByRole('button', { name: 'Můj pokrok', exact: true }).click();
       await expect(page.locator('tbody tr')).toHaveCount(2);
     }
+    await a.getByRole('button', { name: 'Zjistit mou úroveň', exact: true }).first().click();
+    await a.getByRole('button', { name: 'Spustit rozřazení' }).click();
+    const target = (await a.locator('.typing-text').textContent())!;
+    await a.getByRole('textbox', { name: 'Psací pole' }).pressSequentially(target);
+    await expect(a.locator('.lesson-completed')).toContainText('Lekce 1–6');
+    await expect.poll(() => snapshot?.payload.completed.length, { timeout: 15000 }).toBe(6);
+    await b.getByRole('button', { name: 'Nastavení', exact: true }).click();
+    await expect(b.getByRole('button', { name: 'Synchronizovat teď' })).toBeEnabled();
+    await b.getByRole('button', { name: 'Synchronizovat teď' }).click();
+    await expect(b.locator('.cloud-status')).toContainText('Synchronizováno');
+    await b.getByRole('button', { name: 'Cesta od základů', exact: true }).click();
+    await expect(b.locator('.lesson-card.complete')).toHaveCount(6);
   } finally {
     await Promise.all(contexts.map((c) => c.close()));
   }

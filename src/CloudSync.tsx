@@ -4,6 +4,7 @@ import { Cloud, RefreshCw, LogOut, Check, AlertCircle } from 'lucide-react';
 import { freshProgress, mergeProgress, parseProgress, type Progress } from './engine';
 import { publicCloudConfig, validPublicConfig } from './cloud-config';
 import { supabaseTransport, synchronize } from './sync';
+import { authReturnUrl, authLinkError } from './auth';
 
 const CONFIG_KEY = 'lehce.cloud.config';
 function readConfig() {
@@ -28,14 +29,23 @@ function save(key: string, value: unknown) {
     /* The root app reports persistence failures. */
   }
 }
+function pendingSignup(): { email?: string; attach?: boolean } {
+  try {
+    return JSON.parse(localStorage.getItem('lehce.pendingSignup') || '{}');
+  } catch {
+    return {};
+  }
+}
 export default function CloudSync({
   progress,
   setProgress,
   visible,
+  onAccountChange,
 }: {
   progress: Progress;
   setProgress: Dispatch<SetStateAction<Progress>>;
   visible: boolean;
+  onAccountChange: (email: string | null) => void;
 }) {
   const [config, setConfig] = useState<{ url: string; key: string }>(readConfig);
   const [url, setUrl] = useState(config.url);
@@ -45,7 +55,9 @@ export default function CloudSync({
   const [password, setPassword] = useState('');
   const [attach, setAttach] = useState(true);
   const [status, setStatus] = useState('Místní režim');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => authLinkError(window.location.href));
+  const [authNotice, setAuthNotice] = useState('');
+  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [busy, setBusy] = useState(false);
   const latest = useRef(progress);
   latest.current = progress;
@@ -58,7 +70,7 @@ export default function CloudSync({
     try {
       return validPublicConfig(config.url, config.key)
         ? createClient(config.url, config.key, {
-            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+            auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
             global: {
               fetch: (input, init) =>
                 fetch(input, {
@@ -74,10 +86,11 @@ export default function CloudSync({
       return null;
     }
   }, [config.url, config.key]);
+  useEffect(() => onAccountChange(user?.email ?? null), [user?.email, onAccountChange]);
   useEffect(() => {
     if (!client) return;
     client.auth.startAutoRefresh();
-    const { data } = client.auth.onAuthStateChange((_event, session) => {
+    const { data } = client.auth.onAuthStateChange((event, session) => {
       const incoming = session?.user ?? null;
       if (incoming?.id === active.current) {
         setUser(incoming);
@@ -87,21 +100,34 @@ export default function CloudSync({
       if (oldId) save(`lehce.account.${oldId}`, latest.current);
       active.current = incoming?.id ?? null;
       if (incoming) {
+        const pending = pendingSignup();
+        const ownSignup = pending.email === incoming.email?.toLowerCase();
         const stored = cached(`lehce.account.${incoming.id}`);
-        const next = attaching.current
-          ? mergeProgress(latest.current, stored ?? freshProgress())
-          : (stored ?? freshProgress());
+        const next =
+          attaching.current || (ownSignup && pending.attach)
+            ? mergeProgress(latest.current, stored ?? freshProgress())
+            : (stored ?? freshProgress());
+        if (ownSignup) save('lehce.pendingSignup', {});
         attaching.current = false;
         setProgress(next);
         latest.current = next;
         setStatus('Připraveno k synchronizaci');
+        if (event === 'SIGNED_IN') setAuthNotice('Jste přihlášeni. Váš pokrok se synchronizuje.');
       } else if (oldId) {
         const guest = cached('lehce.guest.progress') ?? freshProgress();
         setProgress(guest);
         latest.current = guest;
         setStatus('Místní režim');
+        setAuthNotice('');
       }
       setUser(incoming);
+    });
+    // Surface callback failures that would otherwise only appear in the console.
+    void client.auth.getSession().then(({ error: sessionError }) => {
+      if (sessionError)
+        setError(
+          'Přihlášení z odkazu se nepodařilo. Zkuste e-mail a heslo nebo nový potvrzovací odkaz.',
+        );
     });
     return () => {
       data.subscription.unsubscribe();
@@ -172,22 +198,52 @@ export default function CloudSync({
     if (!client) return;
     setBusy(true);
     setError('');
+    setAuthNotice('');
     attaching.current = attach;
     save('lehce.guest.progress', latest.current);
     try {
+      if (kind === 'signup')
+        save('lehce.pendingSignup', { email: email.trim().toLowerCase(), attach });
       const result =
         kind === 'login'
           ? await client.auth.signInWithPassword({ email, password })
-          : await client.auth.signUp({ email, password });
+          : await client.auth.signUp({
+              email,
+              password,
+              options: { emailRedirectTo: authReturnUrl(window.location.href) },
+            });
       if (result.error) throw result.error;
       setPassword('');
       if (!result.data.session) {
         attaching.current = false;
-        setStatus('Potvrďte registrační e-mail a potom se přihlaste.');
+        setAuthNotice(
+          'Poslali jsme potvrzovací e-mail. Otevřete odkaz ve zprávě; vrátí vás sem a přihlásí. Pokud účet už máte, použijte Přihlásit.',
+        );
       }
     } catch (e) {
       attaching.current = false;
+      if (kind === 'signup') save('lehce.pendingSignup', {});
       setError(e instanceof Error ? e.message : 'Přihlášení se nepodařilo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resendConfirmation() {
+    if (!client || !email) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { error: resendError } = await client.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: authReturnUrl(window.location.href) },
+      });
+      if (resendError) throw resendError;
+      setAuthNotice(
+        'Pokud účet čeká na potvrzení, poslali jsme nový odkaz. Použijte nejnovější zprávu.',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'E-mail se nepodařilo odeslat.');
     } finally {
       setBusy(false);
     }
@@ -209,6 +265,11 @@ export default function CloudSync({
         {error ? <AlertCircle size={16} /> : <Check size={16} />}
         {status}
       </p>
+      {authNotice && (
+        <p className="auth-notice" role="status">
+          {authNotice}
+        </p>
+      )}
       {error && (
         <p className="warning" role="alert">
           {error} Vaše místní výsledky zůstaly uložené.
@@ -294,9 +355,25 @@ export default function CloudSync({
           className="cloud-form"
           onSubmit={(e) => {
             e.preventDefault();
-            void auth('login');
+            void auth(authView);
           }}
         >
+          <div className="auth-tabs" role="group" aria-label="Přihlášení nebo registrace">
+            <button
+              type="button"
+              aria-pressed={authView === 'login'}
+              onClick={() => setAuthView('login')}
+            >
+              Přihlásit se
+            </button>
+            <button
+              type="button"
+              aria-pressed={authView === 'signup'}
+              onClick={() => setAuthView('signup')}
+            >
+              Vytvořit účet
+            </button>
+          </div>
           <label className="field-label">
             E-mail
             <input
@@ -312,27 +389,32 @@ export default function CloudSync({
             <input
               type="password"
               required
-              minLength={6}
+              minLength={authView === 'signup' ? 8 : 6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
+              autoComplete={authView === 'signup' ? 'new-password' : 'current-password'}
             />
           </label>
+          {authView === 'signup' && <small>Heslo musí mít alespoň 8 znaků.</small>}
           <label className="cloud-attach">
             <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} />
             Přenést aktuální místní pokrok do tohoto účtu
           </label>
           <div className="cloud-buttons">
             <button className="primary-button" disabled={busy}>
-              Přihlásit a synchronizovat
+              {busy
+                ? 'Chvilku prosím…'
+                : authView === 'signup'
+                  ? 'Založit účet'
+                  : 'Přihlásit a synchronizovat'}
             </button>
             <button
               type="button"
               className="quiet-button"
-              disabled={busy || !email || password.length < 8}
-              onClick={() => void auth('signup')}
+              disabled={busy || !email}
+              onClick={() => void resendConfirmation()}
             >
-              Vytvořit účet
+              Poslat nový potvrzovací odkaz
             </button>
           </div>
           <p>

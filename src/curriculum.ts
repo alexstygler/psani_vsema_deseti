@@ -514,7 +514,7 @@ export const lessons: Lesson[] = [
 // deliberately switch to natural Czech rather than pretending restricted keys
 // can form every grammatically correct sentence.
 const controlledCount = 22;
-export function lessonText(index: number, variant: number, weak: string[] = []) {
+export function lessonPool(index: number) {
   const l = lessons[index] ?? lessons[0];
   const learned =
     lessons
@@ -528,6 +528,18 @@ export function lessonText(index: number, variant: number, weak: string[] = []) 
     pool = [...pool, ...l.words.filter(filter).filter(Boolean)];
   if (!pool.length) pool = l.words.filter(filter).filter(Boolean);
   if (!pool.length) throw new Error(`Lesson ${index + 1} has no text within its taught keys`);
+  return [...new Set(pool)];
+}
+
+export function textSignature(text: string) {
+  let hash = 2166136261;
+  for (const char of text) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
+export function lessonText(index: number, variant: number, weak: string[] = [], avoid = '') {
+  let pool = lessonPool(index);
+  variant = Math.abs(Math.floor(variant));
   if (weak.length) {
     // Stable prioritization retains variation among equally relevant phrases.
     const offset = Math.abs(variant) % pool.length;
@@ -545,12 +557,18 @@ export function lessonText(index: number, variant: number, weak: string[] = []) 
     const offset = Math.abs(variant) % pool.length;
     pool = [...pool.slice(offset), ...pool.slice(0, offset)];
   }
-  const parts: string[] = [];
-  let length = 0;
-  for (let i = 0; length < 115 && i < 100; i++) {
-    const part = pool[i % pool.length];
-    parts.push(part);
-    length += part.length + 1;
+  // Try each rotation, including when weak-key priority changes between attempts.
+  // Comparing the previous text prevents a retry from cycling back to the same task.
+  for (let rotation = 0; rotation < pool.length; rotation++) {
+    const parts: string[] = [];
+    let length = 0;
+    for (let i = 0; length < 115 && i < 100; i++) {
+      const part = pool[(i + rotation) % pool.length];
+      parts.push(part);
+      length += part.length + 1;
+    }
+    const text = parts.join(' ').trim();
+    if (textSignature(text) !== avoid || rotation === pool.length - 1) return text;
   }
-  return parts.join(' ').slice(0, 300).trim();
+  return '';
 }

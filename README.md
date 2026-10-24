@@ -22,6 +22,7 @@ V cloudovém prostředí s nezapisovatelným domovským adresářem použijte `n
 ## Co aplikace umí
 
 - 36 navazujících lekcí v osmi kapitolách: základní poloha, skutečná slova, české věty, diakritika, interpunkce, čísla, Excel a akademické texty. Další lekce se odemkne po celém textu a nejvýše 3 chybných úsecích. Běžné psaní navíc vyžaduje 150 CPM; čísla, znaky a Excel rychlostní podmínku nemají. Opakování mění text a zvýhodňuje obtížné hmaty.
+- Rozřazení do osmi oblastí uzná pouze lekce obsažené v úspěšné části a doporučí, kde pokračovat. Závěrečný test lze spustit přímo i u zamčené lekce; při stejných podmínkách ji dokončí a odemkne následující. Znaky, Excel a citace nemají požadavek na rychlost. Ke zvládnutým lekcím se lze vrátit. Při neúspěchu se dokončení neodebírá a další pokus vynechá předchozí zadání.
 - Režim Na míru: po dokončených cvičeních zvýhodňuje věty obsahující opakovaně chybované klávesy. Seřazení statistik bere v úvahu i latenci; nejde o strojové učení.
 - Běžné a akademické české texty, vlastní text a anglické funkce Excelu (SUM, IF, AVERAGE, COUNT).
 - Tahák a samostatný výběr znaků `< > & / * ( ) + - "` i dalších kombinací. Nápověda používá levý Ctrl + levý Alt; všechny klávesy jsou v základním bloku české QWERTZ, bez numerické klávesnice a navigačního bloku.
@@ -33,7 +34,7 @@ V cloudovém prostředí s nezapisovatelným domovským adresářem použijte `n
 - Ovládání přes Enter: začátek, návrat z pauzy, další lekce po splnění, jinak nový pokus. Vybraná lekce se rovnou připraví k psaní.
 - Samostatné klávesové dovednosti: Caps Lock s velkou českou diakritikou, skutečné odstavce s Tab a Enter, opravy Backspacem a Deletem v nativním editoru. Tyto úlohy mají vlastní historii, nehodnotí se v nich CPM ani přesnost stisků. Tab se zachytává pouze v odstavcovém cvičení; Shift + Tab nebo Escape dovolují odejít.
 - Nastavení cíle a zařízení, omezení animací, režim soustředění, export/import zálohy.
-- Volitelné přihlášení přes vlastní Supabase a synchronizace mezi zařízeními s řešením souběžných zápisů. [Postup připojení a publikování](docs/deployment.md).
+- Volitelné přihlášení přes vlastní Supabase, dostupné přímo v horní liště. Registrace, opětovné odeslání potvrzení a automatické přihlášení po návratu z e-mailu na úplnou adresu aplikace. Synchronizace mezi zařízeními řeší souběžné zápisy a zahrnuje i testy a rozřazení. [Postup připojení a publikování](docs/deployment.md).
 - Responzivní rozhraní, lokální fonty včetně češtiny. Místní režim funguje bez účtu, externích API a analytiky. Supabase se kontaktuje pouze po připojení projektu. Žádné povinné denní série.
 
 ## Ověření

@@ -28,6 +28,7 @@ import {
   Target,
   Timer,
   TrendingUp,
+  UserRound,
   X,
 } from 'lucide-react';
 import CloudSync from './CloudSync';
@@ -35,6 +36,16 @@ import Garden from './Garden';
 import SymbolGuide from './SymbolGuide';
 import { insertCharacter, deleteBackward } from './typing';
 import EditorLab from './EditorLab';
+import { hasAuthCallback } from './auth';
+import {
+  assessmentRules,
+  placementStages,
+  placementText,
+  recommendedStage,
+  stageLessons,
+  type Assessment,
+} from './assessment';
+import { textSignature } from './curriculum';
 import { version as appVersion } from '../package.json';
 import {
   addSession,
@@ -64,7 +75,7 @@ import {
   type Settings,
 } from './engine';
 
-type Page = 'practice' | 'lessons' | 'skills' | 'progress' | 'settings';
+type Page = 'practice' | 'lessons' | 'skills' | 'progress' | 'settings' | 'account' | 'assessment';
 const modeNames: Record<Mode, string> = {
   adaptive: 'Na míru',
   beginner: 'Základy',
@@ -87,12 +98,17 @@ function durationLabel(s: number) {
 
 export default function App() {
   const [progress, setProgress] = useState<Progress>(load);
-  const [page, setPage] = useState<Page>('practice');
+  const [page, setPage] = useState<Page>(() =>
+    hasAuthCallback(window.location.href) ? 'account' : 'practice',
+  );
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [assessment, setAssessment] = useState<Assessment | undefined>();
+  const [placementStage, setPlacementStage] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>(() =>
     progress.settings.level === 'beginner' ? 'beginner' : 'adaptive',
   );
   const [lesson, setLesson] = useState(() => nextLesson(progress.completed));
-  const [seed, setSeed] = useState(0);
+  const [seed, setSeed] = useState(() => progress.sessions.length);
   const [symbolFocus, setSymbolFocus] = useState('');
   const [modal, setModal] = useState<'intro' | 'help' | 'custom' | 'reset' | null>(null);
   const [custom, setCustom] = useState('');
@@ -118,12 +134,18 @@ export default function App() {
     setMobileNav(false);
     window.scrollTo({ top: 0 });
   }
-  function start(m: Mode, l = nextLesson(progress.completed)) {
-    if (m === 'beginner' && !lessonUnlocked(l, progress.completed)) return;
+  function start(m: Mode, l = nextLesson(progress.completed), exam: boolean | 'review' = false) {
+    if (m === 'beginner' && !exam && !lessonUnlocked(l, progress.completed)) return;
+    setAssessment(exam === true ? { kind: 'exam' } : undefined);
     setMode(m);
     setLesson(l);
     setSeed((v) => v + 1);
     navigate('practice');
+  }
+  function beginPlacement(stage: number) {
+    setPlacementStage(stage);
+    setSeed((v) => v + 1);
+    navigate('assessment');
   }
   function saveSession(session: Session, keys: Record<string, KeyStat>, complete: boolean) {
     setProgress((p) =>
@@ -140,6 +162,7 @@ export default function App() {
   const nav = [
     { id: 'practice' as Page, label: 'Procvičování', icon: Keyboard },
     { id: 'lessons' as Page, label: 'Cesta od základů', icon: BookOpen },
+    { id: 'assessment' as Page, label: 'Zjistit mou úroveň', icon: GraduationCap },
     { id: 'skills' as Page, label: 'Klávesové dovednosti', icon: Command },
     { id: 'progress' as Page, label: 'Můj pokrok', icon: LineChart },
   ];
@@ -188,6 +211,13 @@ export default function App() {
         </div>
         <div className="sidebar-bottom">
           <button
+            className={`nav-item ${page === 'account' ? 'selected' : ''}`}
+            onClick={() => navigate('account')}
+          >
+            <UserRound size={18} />
+            Účet a synchronizace
+          </button>
+          <button
             className={`nav-item ${page === 'settings' ? 'selected' : ''}`}
             onClick={() => navigate('settings')}
           >
@@ -229,11 +259,13 @@ export default function App() {
               Čeština · QWERTZ
             </span>
             <button
-              className="avatar"
-              aria-label="Otevřít nastavení profilu"
-              onClick={() => navigate('settings')}
+              className="account-button"
+              onClick={() => navigate('account')}
+              title={accountEmail ?? 'Přihlášení a registrace'}
             >
-              VY
+              <UserRound size={18} />
+              <span>{accountEmail ? 'Můj účet' : 'Přihlásit / Vytvořit účet'}</span>
+              {accountEmail && <span className="status-dot" />}
             </button>
           </div>
         </header>
@@ -283,6 +315,16 @@ export default function App() {
                 </div>
               )}
               <Garden progress={progress} onContinue={() => start('beginner')} />
+              <div className="assessment-invite">
+                <GraduationCap size={23} />
+                <div>
+                  <strong>Už něco umíte? Nemusíte začínat od nuly.</strong>
+                  <p>Rozřazení ověří vaše dovednosti a uzná zvládnuté lekce.</p>
+                </div>
+                <button className="quiet-button" onClick={() => navigate('assessment')}>
+                  Zjistit mou úroveň <ArrowRight size={16} />
+                </button>
+              </div>
               <div className="workspace-grid">
                 <div className="practice-column">
                   <div className="mode-tabs" role="group" aria-label="Druh cvičení">
@@ -337,6 +379,7 @@ export default function App() {
                     seed={seed}
                     custom={custom}
                     symbolFocus={symbolFocus}
+                    assessment={assessment}
                     progress={progress}
                     onFinish={saveSession}
                     onRestart={() => setSeed((v) => v + 1)}
@@ -482,38 +525,61 @@ export default function App() {
                   {progress.completed.length} / {lessons.length} lekcí
                 </span>
               </div>
+              <div className="assessment-invite">
+                <GraduationCap size={24} />
+                <div>
+                  <strong>Přeskočte to, co už zvládáte.</strong>
+                  <p>
+                    Zvolte rozřazení, nebo rovnou závěrečný test libovolné lekce. Úspěšný test se
+                    počítá jako její dokončení.
+                  </p>
+                </div>
+                <button className="quiet-button" onClick={() => navigate('assessment')}>
+                  Rozřadit podle úrovně <ArrowRight size={16} />
+                </button>
+              </div>
               <div className="lesson-grid">
                 {lessons.map((l, i) => (
-                  <button
-                    className={`lesson-card ${progress.completed.includes(i) ? 'complete' : ''}`}
-                    key={l.title}
-                    disabled={!lessonUnlocked(i, progress.completed)}
-                    title={
-                      !lessonUnlocked(i, progress.completed)
-                        ? 'Nejprve zvládněte předchozí lekci podle jejích podmínek.'
-                        : undefined
-                    }
-                    onClick={() => start('beginner', i)}
-                  >
-                    <div className="lesson-number">
-                      {progress.completed.includes(i) ? (
-                        <Check size={20} />
-                      ) : (
-                        String(i + 1).padStart(2, '0')
-                      )}
-                    </div>
-                    <div>
-                      <span>{l.subtitle}</span>
-                      <h3>{l.title}</h3>
-                      <p>
-                        {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'} ·{' '}
-                        {lessonUnlocked(i, progress.completed)
-                          ? `${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
-                          : 'Zatím zamčeno'}
-                      </p>
-                    </div>
-                    <ArrowRight size={18} />
-                  </button>
+                  <div className="lesson-item" key={l.title}>
+                    <button
+                      className={`lesson-card ${progress.completed.includes(i) ? 'complete' : ''}`}
+                      disabled={!lessonUnlocked(i, progress.completed)}
+                      title={
+                        !lessonUnlocked(i, progress.completed)
+                          ? 'Nejprve zvládněte předchozí lekci podle jejích podmínek.'
+                          : undefined
+                      }
+                      onClick={() => start('beginner', i)}
+                    >
+                      <div className="lesson-number">
+                        {progress.completed.includes(i) ? (
+                          <Check size={20} />
+                        ) : (
+                          String(i + 1).padStart(2, '0')
+                        )}
+                      </div>
+                      <div>
+                        <span>{l.subtitle}</span>
+                        <h3>{l.title}</h3>
+                        <p>
+                          {l.keys ? l.keys.split('').slice(0, 10).join(' ') : 'Smysluplné věty'} ·{' '}
+                          {lessonUnlocked(i, progress.completed)
+                            ? `${lessonRules(i).minCpm ? '150 CPM' : 'Bez rychlostního limitu'} · nejvýše 3 chyby`
+                            : 'Zatím zamčeno'}
+                        </p>
+                      </div>
+                      <ArrowRight size={18} />
+                    </button>
+                    <button
+                      className="lesson-test"
+                      onClick={() => start('beginner', i, true)}
+                      aria-label={`Závěrečný test lekce ${i + 1}: ${l.title}`}
+                    >
+                      <GraduationCap size={15} />{' '}
+                      {progress.completed.includes(i) ? 'Ověřit znovu' : 'Závěrečný test'}{' '}
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
               <p className="footnote">
@@ -523,6 +589,123 @@ export default function App() {
                 ještě nemohou tvořit slova; od čtvrté lekce začínají skutečná slova a později věty.
               </p>
             </>
+          )}
+          {page === 'assessment' && (
+            <>
+              <PageHeading
+                eyebrow="ZAČNĚTE TAM, KDE TO DÁVÁ SMYSL"
+                title="Co už vaše ruce umí?"
+                description="Ověříme jednotlivé oblasti. Za úspěšnou část získáte dokončené lekce a můžete pokračovat dál."
+              />
+              {placementStage === null ? (
+                <>
+                  <section className="placement-intro settings-card">
+                    <GraduationCap size={32} />
+                    <h2>
+                      {recommendedStage(progress.completed) < 0
+                        ? 'Všechny oblasti už máte zvládnuté.'
+                        : 'Krátké ověření místo opakování základů.'}
+                    </h2>
+                    {progress.sessions.some((s) => s.assessment?.kind === 'placement') && (
+                      <div className="placement-recommendation">
+                        <strong>Vaše doporučení:</strong>{' '}
+                        {recommendedStage(progress.completed) < 0
+                          ? 'Kurz máte ověřený. Pokračujte vlastním tréninkem a zvyšujte svůj osobní cíl.'
+                          : `Pokračujte oblastí „${placementStages[recommendedStage(progress.completed)].title}“. Předchozí zvládnuté lekce zůstávají dokončené.`}
+                      </div>
+                    )}
+                    <p>
+                      Pište bez koukání na klávesnici. Každou část splníte opsáním celého textu s
+                      nejvýše 3 chybnými úseky. U běžného psaní potřebujete 150 CPM; u čísel, znaků,
+                      Excelu a citací rychlost nerozhoduje.
+                    </p>
+                    <p>
+                      Po každé části můžete skončit a vrátit se později. Neúspěch vám nic neodebere.
+                      Test hodnotí psaní; polohu prstů ani pohled na klávesnici rozpoznat neumí.
+                    </p>
+                    <button
+                      className="primary-button"
+                      onClick={() =>
+                        beginPlacement(Math.max(0, recommendedStage(progress.completed)))
+                      }
+                    >
+                      {progress.completed.length ? 'Pokračovat v rozřazení' : 'Spustit rozřazení'}{' '}
+                      <ArrowRight size={16} />
+                    </button>
+                  </section>
+                  <div className="placement-stages">
+                    {placementStages.map((stage, i) => (
+                      <button key={stage.title} onClick={() => beginPlacement(i)}>
+                        <span>
+                          {stageLessons(i).every((l) => progress.completed.includes(l)) ? (
+                            <Check size={19} />
+                          ) : (
+                            String(i + 1).padStart(2, '0')
+                          )}
+                        </span>
+                        <div>
+                          <strong>{stage.title}</strong>
+                          <small>
+                            Lekce {stage.from + 1}
+                            {stage.to !== stage.from ? `–${stage.to + 1}` : ''} ·{' '}
+                            {assessmentRules({ kind: 'placement', stage: i }, stage.to).minCpm
+                              ? '150 CPM'
+                              : 'Bez rychlostního limitu'}{' '}
+                            · nejvýše 3 chyby
+                          </small>
+                        </div>
+                        <ArrowRight size={17} />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="placement-heading">
+                    <button className="quiet-button" onClick={() => setPlacementStage(null)}>
+                      <ArrowLeft size={16} /> Přehled rozřazení
+                    </button>
+                    <span>
+                      Část {placementStage + 1} z {placementStages.length} ·{' '}
+                      {placementStages[placementStage].title}
+                    </span>
+                  </div>
+                  <Practice
+                    key={`placement-${placementStage}-${seed}`}
+                    mode="beginner"
+                    lesson={placementStages[placementStage].to}
+                    seed={seed}
+                    custom=""
+                    symbolFocus=""
+                    assessment={{ kind: 'placement', stage: placementStage }}
+                    progress={progress}
+                    onFinish={saveSession}
+                    onRestart={() => setSeed((v) => v + 1)}
+                    onNext={() =>
+                      placementStage < placementStages.length - 1
+                        ? beginPlacement(placementStage + 1)
+                        : setPlacementStage(null)
+                    }
+                    onSettings={settings}
+                    onTrain={() =>
+                      start(
+                        'beginner',
+                        stageLessons(placementStage).find((l) => !progress.completed.includes(l)) ??
+                          placementStages[placementStage].from,
+                        'review',
+                      )
+                    }
+                  />
+                </>
+              )}
+            </>
+          )}
+          {page === 'account' && (
+            <PageHeading
+              eyebrow="VÁŠ POSTUP CESTUJE S VÁMI"
+              title="Váš účet."
+              description="Přihlaste se nebo si zdarma vytvořte účet. Dokončené lekce i výsledky budete mít na všech svých zařízeních."
+            />
           )}
           {page === 'skills' && (
             <EditorLab progress={progress} onSave={(session) => saveSession(session, {}, true)} />
@@ -690,7 +873,12 @@ export default function App() {
               </p>
             </>
           )}
-          <CloudSync progress={progress} setProgress={setProgress} visible={page === 'settings'} />
+          <CloudSync
+            progress={progress}
+            setProgress={setProgress}
+            visible={page === 'settings' || page === 'account'}
+            onAccountChange={setAccountEmail}
+          />
           <footer>
             <span>
               lehce<span className="brand-dot">.</span>
@@ -985,6 +1173,8 @@ function Practice({
   onRestart,
   onNext,
   onSettings,
+  assessment,
+  onTrain,
 }: {
   mode: Mode;
   lesson: number;
@@ -996,21 +1186,21 @@ function Practice({
   onRestart: () => void;
   onNext: () => void;
   onSettings: (s: Partial<Settings>) => void;
+  assessment?: Assessment;
+  onTrain?: () => void;
 }) {
-  const [target] = useState(() =>
-    makeText(
-      mode,
-      lesson,
-      progress.keys,
-      seed +
-        progress.sessions.filter(
+  const [target] = useState(() => {
+    const previous =
+      progress.sessions
+        .filter(
           (s) => s.mode === 'beginner' && s.lesson === lesson && s.lessonVersion === COURSE_VERSION,
-        ).length,
-      custom,
-      symbolFocus,
-    ),
-  );
-  const rules = lessonRules(lesson);
+        )
+        .at(-1)?.textSignature ?? '';
+    if (assessment?.kind === 'placement') return placementText(assessment.stage, seed, previous);
+    return makeText(mode, lesson, progress.keys, seed, custom, symbolFocus, previous);
+  });
+  const rules = assessmentRules(assessment, lesson);
+  const canContinue = assessment?.kind === 'placement' || lesson < lessons.length - 1;
   const untimed = mode === 'symbols' || (mode === 'beginner' && rules.minCpm === 0);
   const limit = untimed
     ? Infinity
@@ -1077,6 +1267,8 @@ function Practice({
       finished: e.index >= target.length,
       lessonVersion: COURSE_VERSION,
       bestCombo: e.bestCombo,
+      assessment,
+      textSignature: mode === 'beginner' ? textSignature(target) : undefined,
     };
     onFinish(session, e.keys, e.index >= target.length);
     setResult(session);
@@ -1100,13 +1292,13 @@ function Practice({
         return;
       event.preventDefault();
       if (run.current.done && result) {
-        if (mode === 'beginner' && lessonPassed(result) && lesson < lessons.length - 1) onNext();
+        if (mode === 'beginner' && lessonPassed(result) && canContinue) onNext();
         else onRestart();
       } else input.current?.focus();
     }
     document.addEventListener('keydown', enter);
     return () => document.removeEventListener('keydown', enter);
-  }, [result, mode, lesson, onNext, onRestart]);
+  }, [result, mode, lesson, canContinue, onNext, onRestart]);
   const finishRef = useRef(finish);
   finishRef.current = finish;
   useEffect(() => {
@@ -1209,7 +1401,9 @@ function Practice({
         <div className="session-label">
           <span className="session-dot" />
           {mode === 'beginner'
-            ? `Lekce ${lesson + 1} · ${lessons[lesson].title}`
+            ? assessment?.kind === 'placement'
+              ? `Rozřazení ${assessment.stage + 1} · ${placementStages[assessment.stage].title}`
+              : `${assessment?.kind === 'exam' ? 'Závěrečný test' : 'Lekce'} ${lesson + 1} · ${lessons[lesson].title}`
             : mode === 'adaptive'
               ? 'Vaše chvilka soustředění'
               : modeNames[mode]}
@@ -1244,6 +1438,18 @@ function Practice({
           </button>
         </div>
       </div>
+      {assessment && !result && (
+        <div className="exam-notice">
+          <GraduationCap size={18} />
+          <span>
+            {assessment.kind === 'placement'
+              ? `Úspěch uzná lekce ${placementStages[assessment.stage].from + 1}–${lesson + 1}.`
+              : 'Úspěšný test dokončí tuto lekci a odemkne další.'}{' '}
+            Celý text · nejvýše 3 chyby
+            {rules.minCpm ? ' · alespoň 150 CPM' : ' · bez rychlostního limitu'}.
+          </span>
+        </div>
+      )}
       {!result ? (
         <>
           <div className="live-stats">
@@ -1558,7 +1764,18 @@ function Practice({
           {mode === 'beginner' && lessonPassed(result) && (
             <p className="lesson-completed">
               <Check size={17} />
-              Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.
+              {assessment?.kind === 'placement'
+                ? `Oblast zvládnutá. Lekce ${placementStages[assessment.stage].from + 1}–${lesson + 1} jsou dokončené.`
+                : assessment?.kind === 'exam'
+                  ? 'Závěrečný test splněn. Lekce je dokončená a další odemčená.'
+                  : 'Lekce zvládnutá. Můžete se k ní kdykoliv vrátit.'}
+            </p>
+          )}
+          {assessment?.kind === 'placement' && (
+            <p className="placement-recommendation">
+              {lessonPassed(result)
+                ? `Zvládáte oblast „${placementStages[assessment.stage].title}“. ${assessment.stage < placementStages.length - 1 ? `Dále můžete ověřit „${placementStages[assessment.stage + 1].title}“.` : 'Dosáhli jste závěrečné oblasti kurzu.'}`
+                : `Doporučujeme procvičit „${placementStages[assessment.stage].title}“. Dosavadní dokončené lekce zůstávají zachované.`}
             </p>
           )}
           {mode === 'beginner' && (
@@ -1599,9 +1816,19 @@ function Practice({
               <RotateCcw size={16} />
               Ještě jeden malý krok
             </button>
-            {mode === 'beginner' && lessonPassed(result) && lesson < lessons.length - 1 && (
+            {onTrain && !lessonPassed(result) && (
+              <button className="primary-button" onClick={onTrain}>
+                Procvičit tuto oblast <ArrowRight size={16} />
+              </button>
+            )}
+            {mode === 'beginner' && lessonPassed(result) && canContinue && (
               <button className="primary-button" onClick={onNext}>
-                Další lekce <ArrowRight size={16} />
+                {assessment?.kind === 'placement'
+                  ? assessment.stage < placementStages.length - 1
+                    ? 'Další část rozřazení'
+                    : 'Dokončit rozřazení'
+                  : 'Další lekce'}{' '}
+                <ArrowRight size={16} />
               </button>
             )}
           </div>
@@ -1770,7 +1997,11 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                         <td>
                           {s.mode === 'skills'
                             ? `Dovednosti · ${s.skill ?? 'editor'}`
-                            : (modeNames[s.mode] ?? 'Cvičení')}
+                            : s.assessment?.kind === 'placement'
+                              ? `Rozřazení · ${placementStages[s.assessment.stage]?.title ?? 'ověření'}`
+                              : s.assessment?.kind === 'exam'
+                                ? `Závěrečný test · lekce ${s.lesson + 1}`
+                                : (modeNames[s.mode] ?? 'Cvičení')}
                         </td>
                         <td>
                           {s.mode === 'symbols' ||
