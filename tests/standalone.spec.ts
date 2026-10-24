@@ -36,7 +36,7 @@ test('samostatný soubor nepotřebuje další soubory ani síť a zachová pokro
       .getByRole('textbox', { name: 'Vlastní text k procvičení' })
       .fill('Příliš žluťoučký kůň. =A1*B1');
     await page.getByRole('button', { name: 'Procvičit můj text' }).click();
-    await page.getByRole('button', { name: 'Klikněte sem' }).click();
+    await page.getByRole('textbox', { name: 'Psací pole' }).focus();
     await page
       .getByRole('textbox', { name: 'Psací pole' })
       .pressSequentially('Příliš žluťoučký kůň. =A1*B1');

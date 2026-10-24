@@ -8,7 +8,7 @@ import {
   lessonRules,
 } from './curriculum';
 export { lessons, COURSE_VERSION, PASS_CPM, MAX_ERRORS, lessonRules } from './curriculum';
-export type Mode = 'adaptive' | 'beginner' | 'text' | 'academic' | 'symbols' | 'custom';
+export type Mode = 'adaptive' | 'beginner' | 'text' | 'academic' | 'symbols' | 'custom' | 'skills';
 export type KeyStat = { attempts: number; errors: number; ms: number; samples: number };
 export type Session = {
   id: string;
@@ -25,6 +25,8 @@ export type Session = {
   lessonVersion?: number;
   keyStats?: Record<string, KeyStat>;
   bestCombo?: number;
+  skill?: string;
+  accuracyMeasured?: boolean;
 };
 export type Settings = {
   level: 'retrain' | 'beginner';
@@ -146,6 +148,7 @@ export function lessonPassed(session: Session) {
 export function isSpeedPractice(session: Pick<Session, 'mode' | 'lesson'>) {
   return (
     session.mode !== 'symbols' &&
+    session.mode !== 'skills' &&
     !(session.mode === 'beginner' && lessonRules(session.lesson).minCpm === 0)
   );
 }
@@ -396,7 +399,10 @@ export function keyInfo(char: string): KeyInfo | undefined {
     symbols.filter((s) => s.combo.startsWith('Ctrl + Alt')).map((s) => [s.char, s.code]),
   );
   if (altCodes[char]) return { ...rows.flat().find((k) => k.code === altCodes[char])!, alt: true };
-  if (char === 'Ů') return { ...rows[2][9], caps: true };
+  if ('ĚŠČŘŽÝÁÍÉÚŮ'.includes(char)) {
+    const key = rows.flat().find((k) => k.label.toLowerCase() === char.toLowerCase());
+    if (key) return { ...key, caps: true };
+  }
   if ('ďťňóĎŤŇÓĚŠČŘŽÝÁÍÉÚ'.includes(char) && char) {
     const base = char.normalize('NFD')[0];
     const found = rows.flat().find((k) => k.label.toLowerCase() === base.toLowerCase());

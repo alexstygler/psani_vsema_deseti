@@ -45,7 +45,7 @@ describe('měření a adaptivní trénink', () => {
     expect(keyInfo('*')).toMatchObject({ code: 'Slash', alt: true });
     expect(keyInfo('A')).toMatchObject({ code: 'KeyA', shift: true });
     expect(keyInfo('ť')).toMatchObject({ code: 'KeyT', dead: 'caron' });
-    expect(keyInfo('Á')).toMatchObject({ code: 'KeyA', dead: 'acute', shift: true });
+    expect(keyInfo('Á')).toMatchObject({ code: 'Digit8', caps: true });
     expect(keyInfo('Ů')).toMatchObject({ code: 'Semicolon', caps: true });
   });
   it('normalizuje vlastní text a zachovává české znaky', () => {

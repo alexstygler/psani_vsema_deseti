@@ -15,7 +15,7 @@ Web lze zveřejnit hned bez Supabase. Pro první publikování stačí krok 2: p
 
 1. V repozitáři `alexstygler/psani_vsema_deseti` otevřete **Settings → Pages → Build and deployment → Source → GitHub Actions**.
 2. V **Settings → Secrets and variables → Actions → Variables** pro synchronizaci volitelně přidejte veřejné proměnné `VITE_SUPABASE_URL` a `VITE_SUPABASE_ANON_KEY` z předchozího kroku. Nejsou to tajné serverové klíče; výsledný web je bude obsahovat.
-3. Otevřete **Actions → Publikovat Lehce na GitHub Pages → Run workflow**. Další změny na `main` se publikují automaticky. Výslednou veřejnou adresu vypíše úspěšná úloha `deploy`; samotný commit nedokazuje úspěšné nasazení.
+3. Otevřete **Actions → Publikovat Lehce na GitHub Pages → Run workflow**. Další změny na `main` se publikují automaticky. Úloha `deploy` po publikování provede skutečné HTTP požadavky na veřejnou stránku, JavaScript a CSS a ověří verzi aplikace. Výsledek i adresa jsou v souhrnu běhu pod „Veřejný web ověřen“. Samotný commit nedokazuje úspěšné nasazení.
 
 Pokud nebyl změněn název repozitáře ani vlastní doména, očekávaná adresa je `https://alexstygler.github.io/psani_vsema_deseti/`. **Toto je očekávaná adresa, nikoliv potvrzení dostupnosti.** V tomto cloudovém prostředí je GitHub REST API blokováno síťovou politikou, takže zapnutí Pages a stav nasazení musí potvrdit nastavení repozitáře a úspěšný běh Actions.
 

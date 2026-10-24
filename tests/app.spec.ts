@@ -12,9 +12,10 @@ test('začátečník dokončí lekci, chyby se zaznamenají a pokrok přežije o
   await page.getByRole('button', { name: 'Najít základní polohu' }).click();
   const target = await page.locator('.typing-text').textContent();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   await input.pressSequentially('x');
-  await expect(page.locator('.typing-feedback')).toContainText(`Zkuste „${target![0]}“`);
+  await expect(page.locator('.typing-feedback')).toContainText('Chybný úsek');
+  await input.press('Backspace');
   await input.pressSequentially(target!, { delay: 5 });
   await expect(page.getByRole('status')).toContainText('Lekce zvládnutá');
   await expect(page.locator('.result-stats')).toContainText('99 %');
@@ -33,7 +34,7 @@ test('pauza zastaví čas a limit dokončí právě jedno cvičení', async ({ p
   await page.clock.pauseAt(new Date('2026-10-23T12:01:00Z'));
   await page.goto('/');
   const input = page.getByRole('textbox', { name: 'Psací pole' });
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   const target = (await page.locator('.typing-text').textContent())!;
   await input.pressSequentially(target.slice(0, 4));
   await page.clock.runFor(10000);
@@ -60,7 +61,7 @@ test('české znaky, oprava Backspace a vlastní text skutečně fungují', asyn
     .fill('Příliš žluťoučký kůň. =A1*B1');
   await page.getByRole('button', { name: 'Procvičit můj text' }).click();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   await input.pressSequentially('Př');
   await input.press('Backspace');
   await expect(page.locator('.text-count')).toHaveText('1 / 28');

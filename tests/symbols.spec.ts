@@ -15,7 +15,7 @@ test('Excel po deseti minutách bez rychlosti odemkne další lekci', async ({ p
   const text = (await page.locator('.typing-text').textContent())!;
   expect(text).toContain('SUM(');
   expect(text).not.toContain('SUMA');
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
   await input.pressSequentially(text[0]);
   await page.clock.fastForward(600000);
@@ -34,7 +34,7 @@ test('tahák zaměří znak a zvýrazní Ctrl i Alt, bez numerického bloku', as
   await page.getByRole('button', { name: 'Procvičit <: Ctrl + Alt + ,', exact: true }).click();
   const text = (await page.locator('.typing-text').textContent())!;
   const prefix = text.slice(0, text.indexOf('<'));
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
   await input.pressSequentially(prefix);
   await expect(page.locator('.keyboard-heading')).toContainText('< · Ctrl + Alt + ,');

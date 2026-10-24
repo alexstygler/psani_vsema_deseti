@@ -36,6 +36,14 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: actions/configure-pages@v5
       - uses: actions/deploy-pages@v4
         id: deployment
+      - name: Ověřit veřejný web
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: node scripts/check-deployment.mjs

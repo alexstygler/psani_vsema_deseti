@@ -13,7 +13,9 @@ export default function Garden({
     { name: 'Tisíc malých kroků', done: j.characters >= 1000, detail: '1 000 opsaných znaků' },
     {
       name: 'Čistý proud',
-      done: progress.sessions.some((s) => s.errors === 0 && s.characters >= 100),
+      done: progress.sessions.some(
+        (s) => s.accuracyMeasured !== false && s.errors === 0 && s.characters >= 100,
+      ),
       detail: '100 znaků bez chyby',
     },
     {

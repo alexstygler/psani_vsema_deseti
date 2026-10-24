@@ -21,14 +21,17 @@ V cloudovém prostředí s nezapisovatelným domovským adresářem použijte `n
 
 ## Co aplikace umí
 
-- 36 navazujících lekcí v osmi kapitolách: základní poloha, skutečná slova, české věty, diakritika, interpunkce, čísla, Excel a akademické texty. Další lekce se odemkne po celém textu a nejvýše 3 chybných stiscích. Běžné psaní navíc vyžaduje 150 CPM; čísla, znaky a Excel rychlostní podmínku nemají. Opakování mění text a zvýhodňuje obtížné hmaty.
+- 36 navazujících lekcí v osmi kapitolách: základní poloha, skutečná slova, české věty, diakritika, interpunkce, čísla, Excel a akademické texty. Další lekce se odemkne po celém textu a nejvýše 3 chybných úsecích. Běžné psaní navíc vyžaduje 150 CPM; čísla, znaky a Excel rychlostní podmínku nemají. Opakování mění text a zvýhodňuje obtížné hmaty.
 - Režim Na míru: po dokončených cvičeních zvýhodňuje věty obsahující opakovaně chybované klávesy. Seřazení statistik bere v úvahu i latenci; nejde o strojové učení.
 - Běžné a akademické české texty, vlastní text a anglické funkce Excelu (SUM, IF, AVERAGE, COUNT).
 - Tahák a samostatný výběr znaků `< > & / * ( ) + - "` i dalších kombinací. Nápověda používá levý Ctrl + levý Alt; všechny klávesy jsou v základním bloku české QWERTZ, bez numerické klávesnice a navigačního bloku.
 - Cvičení na 1, 2 nebo 5 minut; skončí i dřív při opsání celého textu. Čas se spustí až prvním znakem. Pauza tlačítkem, Escape, ztrátou fokusu a přepnutím karty.
 - Nápovědu fyzických kláves a prstů pro standardní českou QWERTZ Windows/Linux. Diakritiku lze zadávat i pomocí mrtvých kláves. Pro macOS upozorňujeme na odlišné kombinace.
-- Skutečné CPM, přesnost, historii a chyby podle jednotlivých kláves. Běžné lekce vyžadují alespoň 150 CPM, celý text a nejvýše 3 chyby, s limitem 3 minut. Čísla, znaky, Excel a kombinace kláves nemají časový ani rychlostní limit a neovlivňují průměr rychlosti běžného psaní.
+- Skutečné CPM, přesnost, historii a chyby podle jednotlivých kláves. Běžné lekce vyžadují alespoň 150 CPM, celý text a nejvýše 3 chybné úseky, s limitem 3 minut. Čísla, znaky, Excel a kombinace kláves nemají časový ani rychlostní limit a neovlivňují průměr rychlosti běžného psaní.
 - Rostoucí zahrada, lístky za skutečně opsané znaky a zvládnuté lekce, čtyři odznaky a živé úseky plynulých stisků. Žádné povinné série dní.
+- Chyby se píší dál červeně přeškrtnuté a je nutné je smazat Backspacem. Celý nepřerušený chybný úsek do úplného smazání se počítá jako jedna chyba; přesnost stisků je samostatná metrika.
+- Ovládání přes Enter: začátek, návrat z pauzy, další lekce po splnění, jinak nový pokus. Vybraná lekce se rovnou připraví k psaní.
+- Samostatné klávesové dovednosti: Caps Lock s velkou českou diakritikou, skutečné odstavce s Tab a Enter, opravy Backspacem a Deletem v nativním editoru. Tyto úlohy mají vlastní historii, nehodnotí se v nich CPM ani přesnost stisků. Tab se zachytává pouze v odstavcovém cvičení; Shift + Tab nebo Escape dovolují odejít.
 - Nastavení cíle a zařízení, omezení animací, režim soustředění, export/import zálohy.
 - Volitelné přihlášení přes vlastní Supabase a synchronizace mezi zařízeními s řešením souběžných zápisů. [Postup připojení a publikování](docs/deployment.md).
 - Responzivní rozhraní, lokální fonty včetně češtiny. Místní režim funguje bez účtu, externích API a analytiky. Supabase se kontaktuje pouze po připojení projektu. Žádné povinné denní série.
@@ -51,7 +54,7 @@ Pro kontrolu produkčního sestavení: `npm run preview -- --port 4173`. Výstup
 
 Pokrok se ukládá do `localStorage` pod klíčem `lehce.progress.v1`. Historie staré verze se načte také, ale nový 36lekcový kurz má nové podmínky a dřívější volné splnění lekcí ho neodemkne. Vlastní text se neukládá do historie ani neodesílá. Vymazání dat webu odstraní pokrok; pro přenos do jiného prohlížeče slouží JSON záloha. Pokud prohlížeč zápis odmítne, aplikace zobrazí upozornění. Rozepsané cvičení se při odchodu nebo novém začátku neukládá.
 
-Rychlost se počítá z počtu správně opsaných znaků včetně mezer a aktivního času a zobrazuje se zaokrouhlená dolů. Přesnost je počet správných stisků / všechny pokusy; Backspace sám není pokus. Krátká cvičení dávají jen orientační rychlost. Texty, režimy a zařízení mají rozdílnou obtížnost. Aplikace nedokáže ověřit použitý prst ani to, zda se člověk dívá na klávesnici. Pro cílené přeučování proto doporučujeme začít základní polohou a přechodně snížit rychlost.
+Rychlost se počítá z počtu správně opsaných znaků včetně mezer a aktivního času a zobrazuje se zaokrouhlená dolů. Přesnost je počet přijatých správných stisků / všechny znakové pokusy; Backspace sám není pokus. Limit tří chyb používá souvislé chybné úseky, nikoliv jejich počet písmen. Dokud není chybný úsek úplně smazán, další psaní se přidává do stejného úseku a neposouvá správně opsaný prefix. Starší historie zachovává původní způsob měření. Dovednosti editoru nemají hodnocenou přesnost a nevstupují do jejího průměru. Krátká cvičení dávají jen orientační rychlost. Texty, režimy a zařízení mají rozdílnou obtížnost. Aplikace nedokáže ověřit použitý prst ani to, zda se člověk dívá na klávesnici. Pro cílené přeučování proto doporučujeme začít základní polohou a přechodně snížit rychlost.
 
 Synchronizace účtů je volitelná a vyžaduje vlastní Supabase projekt s přiloženým SQL. Místní režim nemá server. Multiplayer tato verze neobsahuje. Responzivní mobilní rozhraní umožňuje prohlížení; pro skutečný nácvik hmatů potřebujete fyzickou klávesnici. Nápověda nepřepíná systémové rozložení.
 

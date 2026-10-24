@@ -6,18 +6,26 @@ test('čtyři chyby zamknou postup a opakování nabídne jiný text', async ({ 
   await expect(page.locator('.lesson-card').nth(1)).toBeDisabled();
   await page.locator('.lesson-card').first().click();
   const text = (await page.locator('.typing-text').textContent())!;
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
-  await input.pressSequentially('xxxx' + text);
+  for (let i = 0; i < 4; i++) {
+    await input.pressSequentially('x');
+    await input.press('Backspace');
+  }
+  await input.pressSequentially(text);
   await expect(page.locator('.pass-checklist')).toContainText('Chyby 4 / 3');
   await expect(page.getByRole('button', { name: 'Další lekce', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Ještě jeden malý krok' }).click();
+  await page.keyboard.press('Enter');
   const retry = (await page.locator('.typing-text').textContent())!;
   expect(retry).not.toBe(text);
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
-  await input.pressSequentially('xxx' + retry);
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
+  for (let i = 0; i < 3; i++) {
+    await input.pressSequentially('x');
+    await input.press('Backspace');
+  }
+  await input.pressSequentially(retry);
   await expect(page.locator('.pass-checklist')).toContainText('Chyby 3 / 3');
-  await page.getByRole('button', { name: 'Další lekce', exact: true }).click();
+  await page.keyboard.press('Enter');
   await expect(page.locator('.session-label')).toContainText('Lekce 2');
 });
 
@@ -28,7 +36,7 @@ test('pomalé dokončení nestačí k odemčení', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Základy', exact: true }).click();
   const text = (await page.locator('.typing-text').textContent())!;
-  await page.getByRole('button', { name: 'Klikněte sem' }).click();
+  await page.getByRole('textbox', { name: 'Psací pole' }).focus();
   const input = page.getByRole('textbox', { name: 'Psací pole' });
   await input.pressSequentially(text[0]);
   await page.clock.runFor(60000);

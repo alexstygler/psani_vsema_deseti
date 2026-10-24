@@ -33,6 +33,8 @@ import {
 import CloudSync from './CloudSync';
 import Garden from './Garden';
 import SymbolGuide from './SymbolGuide';
+import { insertCharacter, deleteBackward } from './typing';
+import EditorLab from './EditorLab';
 import { version as appVersion } from '../package.json';
 import {
   addSession,
@@ -62,7 +64,7 @@ import {
   type Settings,
 } from './engine';
 
-type Page = 'practice' | 'lessons' | 'progress' | 'settings';
+type Page = 'practice' | 'lessons' | 'skills' | 'progress' | 'settings';
 const modeNames: Record<Mode, string> = {
   adaptive: 'Na míru',
   beginner: 'Základy',
@@ -70,6 +72,7 @@ const modeNames: Record<Mode, string> = {
   academic: 'Akademické texty',
   symbols: 'Čísla a znaky',
   custom: 'Vlastní text',
+  skills: 'Klávesové dovednosti',
 };
 function load() {
   try {
@@ -137,6 +140,7 @@ export default function App() {
   const nav = [
     { id: 'practice' as Page, label: 'Procvičování', icon: Keyboard },
     { id: 'lessons' as Page, label: 'Cesta od základů', icon: BookOpen },
+    { id: 'skills' as Page, label: 'Klávesové dovednosti', icon: Command },
     { id: 'progress' as Page, label: 'Můj pokrok', icon: LineChart },
   ];
   return (
@@ -513,12 +517,15 @@ export default function App() {
                 ))}
               </div>
               <p className="footnote">
-                Další lekci odemknete opsáním celého textu s nejvýše 3 chybnými stisky. U běžného
+                Další lekci odemknete opsáním celého textu s nejvýše 3 chybnými úseky. U běžného
                 psaní navíc platí 150 CPM. Čísla, znaky, vzorce a kombinace kláves procvičujete bez
                 požadavku na rychlost i bez časového limitu. Opakování nabízí jiný text. První hmaty
                 ještě nemohou tvořit slova; od čtvrté lekce začínají skutečná slova a později věty.
               </p>
             </>
+          )}
+          {page === 'skills' && (
+            <EditorLab progress={progress} onSave={(session) => saveSession(session, {}, true)} />
           )}
           {page === 'progress' && (
             <ProgressPage progress={progress} onPractice={() => navigate('practice')} />
@@ -781,9 +788,10 @@ export default function App() {
               <p>
                 <strong>2. Začněte psát zobrazený text.</strong>
                 <br />
-                Čas se rozběhne prvním znakem. Při chybě zůstane kurzor na místě: jednoduše
-                stiskněte správnou klávesu. Backspace vrátí předchozí znak. Vkládání textu je
-                vypnuté.
+                Čas se rozběhne prvním znakem. Chybný úsek se píše dál červeně a přeškrtnutě. Celý
+                ho smažte Backspacem a napište znovu. Jedna souvislá série až do úplného smazání je
+                jedna chyba, i když obsahuje více písmen. Přesnost stisků se počítá samostatně.
+                Vkládání je vypnuté. Enter zahájí psaní a po výsledku pokračuje dál.
               </p>
               <p>
                 <strong>3. Klidně se zastavte.</strong>
@@ -802,7 +810,7 @@ export default function App() {
               <p>
                 <strong>Kdy se odemkne další lekce?</strong>
                 <br />
-                Celý text a nejvýše 3 chybné stisky. U běžného psaní navíc alespoň 150 CPM a limit 3
+                Celý text a nejvýše 3 chybné úseky. U běžného psaní navíc alespoň 150 CPM a limit 3
                 minuty. Čísla, znaky, Excel a kombinace kláves nemají rychlostní ani časový limit.
                 Opakování nabízí jiné pořadí slov nebo nové věty. Historie staré verze zůstává, ale
                 nový kurz má vlastní podmínky postupu.
@@ -960,6 +968,7 @@ type Run = {
   started: number | null;
   lastAt: number | null;
   error: string;
+  errors: number;
   done: boolean;
   paused: boolean;
   combo: number;
@@ -1017,6 +1026,7 @@ function Practice({
     started: null,
     lastAt: null,
     error: '',
+    errors: 0,
     done: false,
     paused: false,
     combo: 0,
@@ -1030,6 +1040,9 @@ function Practice({
   const input = useRef<HTMLTextAreaElement>(null);
   const textViewport = useRef<HTMLDivElement>(null);
   const cursor = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (seed > 0) input.current?.focus({ preventScroll: true });
+  }, []);
   const e = run.current;
   const elapsed = () =>
     e.elapsed + (e.started !== null ? (performance.now() - e.started) / 1000 : 0);
@@ -1060,7 +1073,7 @@ function Practice({
       mode,
       lesson,
       device: progress.settings.device,
-      errors: e.attempts - e.correct,
+      errors: e.errors,
       finished: e.index >= target.length,
       lessonVersion: COURSE_VERSION,
       bestCombo: e.bestCombo,
@@ -1069,6 +1082,31 @@ function Practice({
     setResult(session);
     update();
   }
+  useEffect(() => {
+    function enter(event: KeyboardEvent) {
+      if (
+        event.key !== 'Enter' ||
+        event.repeat ||
+        event.isComposing ||
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        document.querySelector('dialog[open]')
+      )
+        return;
+      const target = event.target as HTMLElement;
+      if (target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]'))
+        return;
+      event.preventDefault();
+      if (run.current.done && result) {
+        if (mode === 'beginner' && lessonPassed(result) && lesson < lessons.length - 1) onNext();
+        else onRestart();
+      } else input.current?.focus();
+    }
+    document.addEventListener('keydown', enter);
+    return () => document.removeEventListener('keydown', enter);
+  }, [result, mode, lesson, onNext, onRestart]);
   const finishRef = useRef(finish);
   finishRef.current = finish;
   useEffect(() => {
@@ -1117,35 +1155,46 @@ function Practice({
     if (e.started === null) e.started = now;
     e.paused = false;
     const expected = target[e.index];
-    const correct = chars[0] === expected;
-    e.keys = recordKey(e.keys, expected, correct, e.lastAt === null ? 0 : now - e.lastAt);
+    const step = insertCharacter(e, chars[0], expected);
+    if (step.recordKey)
+      e.keys = recordKey(e.keys, expected, step.accepted, e.lastAt === null ? 0 : now - e.lastAt);
     e.lastAt = now;
     e.attempts++;
-    if (correct) {
-      e.index++;
+    Object.assign(e, { index: step.index, error: step.error, errors: step.errors });
+    if (step.accepted) {
       e.correct++;
       e.combo++;
       e.bestCombo = Math.max(e.bestCombo, e.combo);
-      e.error = '';
       setNotice('');
     } else {
-      e.error = chars[0];
       e.combo = 0;
     }
     if (e.index >= target.length) finish();
     update();
   }
   const stat = metrics(e.index, e.attempts, e.correct, elapsed());
-  const info = keyInfo(target[e.index] ?? '');
+  const [capsOn, setCapsOn] = useState(false);
+  const info: ReturnType<typeof keyInfo> = e.error
+    ? { label: 'Backspace', code: 'Backspace', finger: 7 }
+    : keyInfo(target[e.index] ?? '');
+  const wrongTail = Array.from(e.error);
+  const cursorPosition = e.index + wrongTail.length;
   const remaining = untimed ? Math.floor(elapsed()) : Math.max(0, Math.ceil(limit - elapsed()));
   const completion = (e.index / Math.max(1, target.length)) * 100;
+  const char = target[e.index] ?? '';
+  const upperLetter = char !== char.toLowerCase() && char === char.toUpperCase();
+  const lowerLetter = char !== char.toUpperCase() && char === char.toLowerCase();
+  const needsShift = !!info?.shift && !(capsOn && upperLetter);
+  const needsCapsToggle = !e.error && ((!!info?.caps && !capsOn) || (capsOn && lowerLetter));
   let hint = info
     ? `${info.label === 'mezerník' ? 'Mezerník' : info.label} · ${fingerNames[info.finger]}`
     : 'Klidně a po jednom znaku';
-  if (info?.shift) hint += ' + Shift opačné ruky';
+  if (needsShift) hint += ' + Shift opačné ruky';
   if (info?.dead)
-    hint = `${info.dead === 'caron' ? 'Shift + ´ (háček)' : '´ (čárka)'}, potom ${info.shift ? 'Shift + ' : ''}${info.label} · ${fingerNames[info.finger]}`;
-  if (info?.caps) hint = 'Caps Lock, potom ů, potom znovu Caps Lock';
+    hint = `${info.dead === 'caron' ? 'Shift + ´ (háček)' : '´ (čárka)'}, potom ${needsShift ? 'Shift + ' : ''}${info.label} · ${fingerNames[info.finger]}`;
+  if (info?.caps)
+    hint = capsOn ? `Caps Lock zapnutý → ${info.label}` : `Zapněte Caps Lock → ${info.label}`;
+  if (capsOn && lowerLetter && !e.error) hint = `Vypněte Caps Lock → ${info?.label ?? char}`;
   if (info?.alt)
     hint =
       progress.settings.os === 'mac'
@@ -1199,8 +1248,8 @@ function Practice({
         <>
           <div className="live-stats">
             <div>
-              <strong>{untimed ? e.attempts - e.correct : e.attempts ? stat.cpm : '—'}</strong>
-              <span>{untimed ? 'chybných stisků' : 'znaků / min'}</span>
+              <strong>{untimed ? e.errors : e.attempts ? stat.cpm : '—'}</strong>
+              <span>{untimed ? 'chybných úseků' : 'znaků / min'}</span>
             </div>
             <div>
               <strong>
@@ -1222,9 +1271,8 @@ function Practice({
                 : `Plynulý úsek: ${e.combo} / 20`}
             </span>
             {mode === 'beginner' && (
-              <span className={e.attempts - e.correct > MAX_ERRORS ? 'needs-care' : ''}>
-                {e.attempts - e.correct} / 3 chyby ·{' '}
-                {rules.minCpm ? 'cíl 150 CPM' : 'rychlost nerozhoduje'}
+              <span className={e.errors > MAX_ERRORS ? 'needs-care' : ''}>
+                {e.errors} / 3 chyby · {rules.minCpm ? 'cíl 150 CPM' : 'rychlost nerozhoduje'}
               </span>
             )}
           </div>
@@ -1240,12 +1288,22 @@ function Practice({
                 {Array.from(target).map((char, i) => (
                   <span
                     key={i}
-                    ref={i === e.index ? cursor : undefined}
-                    className={`${i < e.index ? 'typed' : ''} ${i === e.index ? 'current' : ''} ${i === e.index && e.error ? 'wrong' : ''}`}
+                    ref={i === cursorPosition ? cursor : undefined}
+                    className={`${i < e.index ? 'typed' : ''} ${i === cursorPosition ? 'current' : ''} ${i >= e.index && i < cursorPosition ? 'wrong' : ''}`}
                   >
+                    {i >= e.index && i < cursorPosition ? wrongTail[i - e.index] : char}
+                  </span>
+                ))}
+                {wrongTail.slice(Math.max(0, target.length - e.index)).map((char, i) => (
+                  <span className="wrong" key={`overflow-${i}`}>
                     {char}
                   </span>
                 ))}
+                {cursorPosition >= target.length && (
+                  <span className="current" ref={cursor}>
+                    {' '}
+                  </span>
+                )}
               </div>
             </div>
             <textarea
@@ -1262,6 +1320,7 @@ function Practice({
                 setFocused(false);
                 pause();
               }}
+              onKeyUp={(ev) => setCapsOn(ev.getModifierState('CapsLock'))}
               onPaste={(ev) => {
                 ev.preventDefault();
                 setNotice('Vkládání je vypnuté. Každý znak si zaslouží vlastní stisk.');
@@ -1279,6 +1338,7 @@ function Practice({
                 type(text);
               }}
               onKeyDown={(ev) => {
+                setCapsOn(ev.getModifierState('CapsLock'));
                 if (ev.key === 'Escape') {
                   ev.preventDefault();
                   pause();
@@ -1287,8 +1347,7 @@ function Practice({
                 if (ev.key === 'Backspace') {
                   e.combo = 0;
                   ev.preventDefault();
-                  if (e.error) e.error = '';
-                  else if (e.index > 0) e.index--;
+                  Object.assign(e, deleteBackward(e));
                   e.lastAt = null;
                   update();
                 }
@@ -1298,7 +1357,8 @@ function Practice({
             {!focused && (
               <button className="start-writing" onClick={() => input.current?.focus()}>
                 <Play size={15} fill="currentColor" />
-                {e.attempts ? 'Pokračovat v psaní' : 'Klikněte sem a začněte psát'}
+                {e.attempts ? 'Pokračovat v psaní' : 'Začít psát'}{' '}
+                <kbd aria-hidden="true">Enter</kbd>
               </button>
             )}
           </div>
@@ -1306,7 +1366,7 @@ function Practice({
             <span>
               {notice ||
                 (e.error
-                  ? `To se stává. Zkuste ${target[e.index] === ' ' ? 'mezerník' : `„${target[e.index]}“`} ještě jednou.`
+                  ? 'Chybný úsek je jedna chyba. Vraťte se Backspacem až k jeho začátku.'
                   : e.paused
                     ? 'Čas stojí. Pokračujte, až budete chtít.'
                     : focused
@@ -1322,6 +1382,7 @@ function Practice({
           </div>
           <div className="keyboard-section">
             <div className="keyboard-heading">
+              {capsOn && <span className="caps-indicator">Caps Lock zapnutý</span>}
               <span>
                 {progress.settings.hints ? (
                   <>
@@ -1349,10 +1410,16 @@ function Practice({
               {rows.map((row, ri) => (
                 <div className={`keyboard-row row-${ri}`} key={ri}>
                   {ri === 1 && <span className="key modifier tab-key">tab</span>}
-                  {ri === 2 && <span className="key modifier caps-key">caps</span>}
+                  {ri === 2 && (
+                    <span
+                      className={`key modifier caps-key ${needsCapsToggle ? 'needed' : ''} ${capsOn ? 'caps-active' : ''}`}
+                    >
+                      caps
+                    </span>
+                  )}
                   {ri === 3 && (
                     <span
-                      className={`key modifier shift-key ${info?.shift && info.finger >= 4 ? 'needed' : ''}`}
+                      className={`key modifier shift-key ${needsShift && info && info.finger >= 4 ? 'needed' : ''}`}
                     >
                       shift
                     </span>
@@ -1365,11 +1432,15 @@ function Practice({
                       <span>{k.label}</span>
                     </span>
                   ))}
-                  {ri === 0 && <span className="key modifier backspace-key">←</span>}
+                  {ri === 0 && (
+                    <span className={`key modifier backspace-key ${e.error ? 'needed' : ''}`}>
+                      ←
+                    </span>
+                  )}
                   {ri === 2 && <span className="key modifier enter-key">enter ↵</span>}
                   {ri === 3 && (
                     <span
-                      className={`key modifier shift-key ${info?.shift && info.finger < 4 ? 'needed' : ''}`}
+                      className={`key modifier shift-key ${needsShift && info && info.finger < 4 ? 'needed' : ''}`}
                     >
                       shift
                     </span>
@@ -1520,6 +1591,9 @@ function Practice({
               )}
             </div>
           )}
+          <p className="enter-hint">
+            Enter: další lekce po splnění, jinak nový pokus. Tab: další ovládací prvek.
+          </p>
           <div className="result-actions">
             <button className="quiet-button" onClick={onRestart}>
               <RotateCcw size={16} />
@@ -1548,8 +1622,9 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
   const avg = speedSessions.length
     ? Math.round(speedSessions.reduce((sum, s) => sum + s.cpm, 0) / speedSessions.length)
     : 0;
-  const accuracy = sessions.length
-    ? Math.round(sessions.reduce((sum, s) => sum + s.accuracy, 0) / sessions.length)
+  const accuracySessions = sessions.filter((s) => s.accuracyMeasured !== false);
+  const accuracy = accuracySessions.length
+    ? Math.round(accuracySessions.reduce((sum, s) => sum + s.accuracy, 0) / accuracySessions.length)
     : 0;
   const seconds = sessions.reduce((sum, s) => sum + s.seconds, 0);
   const weak = weakestKeys(progress.keys);
@@ -1584,7 +1659,12 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                 unit: 'CPM',
                 icon: TrendingUp,
               },
-              { label: 'Průměrná přesnost', value: `${accuracy}`, unit: '%', icon: Target },
+              {
+                label: 'Průměrná přesnost',
+                value: accuracySessions.length ? `${accuracy}` : '—',
+                unit: '%',
+                icon: Target,
+              },
               {
                 label: 'Čas pro sebe',
                 value: `${Math.round(seconds / 60)}`,
@@ -1687,16 +1767,23 @@ function ProgressPage({ progress, onPractice }: { progress: Progress; onPractice
                             minute: '2-digit',
                           })}
                         </td>
-                        <td>{modeNames[s.mode] ?? 'Cvičení'}</td>
+                        <td>
+                          {s.mode === 'skills'
+                            ? `Dovednosti · ${s.skill ?? 'editor'}`
+                            : (modeNames[s.mode] ?? 'Cvičení')}
+                        </td>
                         <td>
                           {s.mode === 'symbols' ||
+                          s.mode === 'skills' ||
                           (s.mode === 'beginner' && lessonRules(s.lesson).minCpm === 0)
                             ? 'Bez hodnocení rychlosti'
                             : `${s.cpm} CPM`}
                         </td>
                         <td>
-                          <span className={`accuracy-badge ${s.accuracy < 90 ? 'needs-care' : ''}`}>
-                            {s.accuracy} %
+                          <span
+                            className={`accuracy-badge ${s.accuracyMeasured !== false && s.accuracy < 90 ? 'needs-care' : ''}`}
+                          >
+                            {s.accuracyMeasured === false ? '—' : `${s.accuracy} %`}
                           </span>
                         </td>
                         <td>{s.device === 'keyboard' ? 'Samostatná' : 'Notebook'}</td>

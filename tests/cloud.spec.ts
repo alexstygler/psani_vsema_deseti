@@ -77,7 +77,7 @@ test('dva prohlížeče sdílejí historii přes přihlášení a revize', async
     await page.getByLabel('Další druhy textů').selectOption('custom');
     await page.getByRole('textbox', { name: 'Vlastní text k procvičení' }).fill(text);
     await page.getByRole('button', { name: 'Procvičit můj text' }).click();
-    await page.getByRole('button', { name: 'Klikněte sem' }).click();
+    await page.getByRole('textbox', { name: 'Psací pole' }).focus();
     await page.getByRole('textbox', { name: 'Psací pole' }).pressSequentially(text);
     await expect(page.locator('.result-panel')).toBeVisible();
   }
