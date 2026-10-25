@@ -112,6 +112,25 @@ describe('nový výukový kurz', () => {
     expect(capitalTransition).toContain('dům');
     expect(capitalTransition).not.toMatch(/DůM|LOď|TICHé/);
   });
+  it('skupiny v navazujících cvičeních střídají ruce uvnitř každé skupiny a propojují staré i nové prsty', () => {
+    const hand = (c: string) => ('fds'.includes(c) ? 'left' : 'right');
+    for (const index of [0, 1, 2])
+      for (const exercise of ['words', 'sentences'] as const)
+        for (const variant of [0, 1, 2, 9]) {
+          const text = lessonText(index, variant, ['j'], '', exercise);
+          for (const group of text.split(' ')) {
+            expect([2, 4, 6]).toContain(group.length);
+            for (let i = 1; i < group.length; i++)
+              expect(hand(group[i]), group).not.toBe(hand(group[i - 1]));
+          }
+          for (const c of learnedChars(index)) expect(text).toContain(c);
+          if (index === 1) {
+            // Cross the old left F with new right K, and new left D with old J.
+            expect(text).toMatch(/fk|kf/);
+            expect(text).toMatch(/dj|jd/);
+          }
+        }
+  });
   it('obě navazující cvičení vracejí dostupné předchozí hmaty i u velkých písmen, čísel a symbolů', () => {
     for (let index = 25; index < lessons.length; index++) {
       if (!lessons[index].keys) continue;

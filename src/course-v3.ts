@@ -636,21 +636,31 @@ function drillPool(index: number) {
     ...new Set([a + a, b + b, a + b, b + a, a + a + b + b, a + b + a, b + a + b, a + b + a + b]),
   ];
 }
-// Before vowels are available, connect the new pair to every earlier key.
-// This pool is never used for the initial, isolated touch exercise.
+// Pre-vowel home-row drills join both hands within every group. The isolated
+// touch exercise still uses drillPool; real words are never reshuffled.
 function cumulativeDrillPool(index: number) {
-  const fresh = lessons[index].keys || 'fj';
-  const previous = [...learnedChars(index)].filter((c) => c !== ' ' && !fresh.includes(c));
-  return [
-    ...new Set([
-      ...drillPool(index),
-      ...previous.flatMap((c, i) => [
-        c + fresh[i % fresh.length],
-        fresh[i % fresh.length] + c,
-        c + c,
-      ]),
-    ]),
-  ];
+  const known = [...learnedChars(index)];
+  const left = known.filter((c) => 'asdfg'.includes(c));
+  const right = known.filter((c) => 'hjklů'.includes(c));
+  const groups: string[] = [];
+  for (let l = 0; l < left.length; l++)
+    for (let r = 0; r < right.length; r++) {
+      const a = left[l],
+        b = right[r];
+      const c = left[(l + 1) % left.length],
+        d = right[(r + 1) % right.length];
+      groups.push(
+        a + b,
+        b + a,
+        a + b + c + d,
+        b + a + d + c,
+        a + d + c + b,
+        b + c + d + a,
+        a + b + c + d + a + b,
+        b + a + d + c + b + a,
+      );
+    }
+  return [...new Set(groups)];
 }
 const poolCache = new Map<string, string[]>();
 export function lessonPool(index: number, exercise: LessonExercise = 'sentences') {
