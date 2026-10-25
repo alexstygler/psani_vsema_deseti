@@ -73,7 +73,7 @@ add(
   'home-au',
   'Malíčky a první slova',
   'aů',
-  'sad|dal|jak|klad|sklad|klas|skla|klasů|skladů|dala|sada',
+  'sad|dal|jak|klad|sklad|klas|skla|klasů|skladů|dala|sada|fajfka',
   [],
   'A stiskne levý malíček, Ů pravý. Poprvé můžeme tvořit skutečná slova.',
 );
@@ -82,7 +82,7 @@ add(
   'home-gh',
   'Krátký výlet ukazováčků',
   'gh',
-  'gag|had|hlad|hala|hlas|hlasů|hlahol|hladů',
+  'gala|had|hlad|hala|hlas|hlasů|hlahol|hladů',
   [],
   'Na G se natáhne levý ukazováček z F, na H pravý z J. Potom se oba vrátí na výstupky.',
 );
@@ -91,7 +91,7 @@ add(
   'home-review',
   'Celá prostřední řada',
   '',
-  'sad|had|hlas|sklad|hlad|dala|klasů|gag',
+  'sad|had|hlas|sklad|hlad|dala|klasů|gala',
   [],
   'Spojte prostřední řadu. Ještě nepotřebujete žádné písmeno z horní nebo dolní řady.',
   false,
@@ -571,12 +571,26 @@ export function lessonRules(index: number, exercise?: LessonExercise) {
   const untimed = lessons[index]?.precision || exercise === 'touch';
   return { minCpm: untimed ? 0 : PASS_CPM, maxErrors: MAX_ERRORS, timeLimit: untimed ? null : 180 };
 }
+const reviewSentences = [
+  'Fajfka a sad',
+  'Klasů a skladů',
+  'Hlad a hlas',
+  'Hala je sklad',
+  'Fajfka je u lesa',
+  'U lesa se hraje golf',
+  'U lesa je sklad klasů',
+  'Filip jde do lesa',
+  'Web je plný nápadů',
+  'Quark je pojem z fyziky',
+];
 const dictionary = [
   ...new Set(
-    lessons
-      .flatMap((l) => [...l.words, ...l.sentences.flatMap((s) => s.split(/\s+/))])
+    [
+      ...lessons.flatMap((l) => [...l.words, ...l.sentences.flatMap((s) => s.split(/\s+/))]),
+      ...reviewSentences.flatMap((s) => s.split(/\s+/)),
+    ]
       .flatMap((word) => [word, word.toLocaleLowerCase('cs')])
-      .map((w) => w.replace(/^[.,?!:;"()[\]]+|[.,?!:;"()[\]]+$/g, ''))
+      .flatMap((w) => [w, w.replace(/^[.,?!:;"()[\]]+|[.,?!:;"()[\]]+$/g, '')])
       .filter(Boolean),
   ),
 ];
@@ -586,17 +600,17 @@ function allowed(text: string, index: number) {
 }
 function sentenceFor(text: string, index: number) {
   const known = learnedChars(index);
-  return [...text]
-    .map((c) =>
-      known.includes(c)
-        ? c
-        : /[.,?!:;]/.test(c)
-          ? ''
-          : known.includes(c.toLocaleLowerCase('cs'))
-            ? c.toLocaleLowerCase('cs')
-            : c,
-    )
-    .join('');
+  return text
+    .split(' ')
+    .map((word) => {
+      // Lower a whole word when its capitals have not been introduced. Keeping
+      // only some capitals would turn normal words into fragments like DůM.
+      const form = [...word].some((c) => c.toLocaleLowerCase('cs') !== c && !known.includes(c))
+        ? word.toLocaleLowerCase('cs')
+        : word;
+      return [...form].filter((c) => known.includes(c) || !/[.,?!:;]/.test(c)).join('');
+    })
+    .join(' ');
 }
 function drillPool(index: number) {
   const lesson = lessons[index];
@@ -622,10 +636,37 @@ function drillPool(index: number) {
     ...new Set([a + a, b + b, a + b, b + a, a + a + b + b, a + b + a, b + a + b, a + b + a + b]),
   ];
 }
+// Before vowels are available, connect the new pair to every earlier key.
+// This pool is never used for the initial, isolated touch exercise.
+function cumulativeDrillPool(index: number) {
+  const fresh = lessons[index].keys || 'fj';
+  const previous = [...learnedChars(index)].filter((c) => c !== ' ' && !fresh.includes(c));
+  return [
+    ...new Set([
+      ...drillPool(index),
+      ...previous.flatMap((c, i) => [
+        c + fresh[i % fresh.length],
+        fresh[i % fresh.length] + c,
+        c + c,
+      ]),
+    ]),
+  ];
+}
+const poolCache = new Map<string, string[]>();
 export function lessonPool(index: number, exercise: LessonExercise = 'sentences') {
+  const cacheKey = `${index}:${exercise}`;
+  let pool = poolCache.get(cacheKey);
+  if (!pool) {
+    pool = buildLessonPool(index, exercise);
+    poolCache.set(cacheKey, pool);
+  }
+  // Callers may sort or rotate a pool; keep the cached vocabulary immutable.
+  return [...pool];
+}
+function buildLessonPool(index: number, exercise: LessonExercise) {
   const lesson = lessons[index] ?? lessons[0];
   if (exercise === 'touch') return drillPool(index);
-  if (!lesson.keys) {
+  if (!lesson.keys && ![home, top, bottom, czech].includes(lesson.chapter)) {
     const own =
       exercise === 'sentences' && lesson.sentences.length
         ? lesson.sentences
@@ -642,13 +683,13 @@ export function lessonPool(index: number, exercise: LessonExercise = 'sentences'
   ];
   const sentences = [
     ...new Set(
-      [...lesson.sentences, ...lessons.flatMap((l) => l.sentences)]
+      [...lesson.sentences, ...lessons.flatMap((l) => l.sentences), ...reviewSentences]
         .map((s) => sentenceFor(s, index))
         .filter((s) => allowed(s, index)),
     ),
   ];
   const pool = exercise === 'words' ? words : sentences.length ? sentences : words;
-  return pool.length ? pool : drillPool(index);
+  return pool.length ? pool : cumulativeDrillPool(index);
 }
 export function exerciseLabel(index: number, exercise: LessonExercise) {
   if (exercise === 'touch') return 'Osahání kláves';
@@ -666,6 +707,89 @@ export function textSignature(text: string) {
   for (const char of text) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return (hash >>> 0).toString(36);
 }
+// Case variants share a physical letter key. Keep current new characters exact,
+// but review earlier letters naturally in words instead of forcing every capital.
+const coverageCache = new Map<string, ReadonlySet<string>>();
+function coverageChars(text: string) {
+  let chars = coverageCache.get(text);
+  if (!chars) {
+    chars = new Set([...text.toLocaleLowerCase('cs')].filter((c) => c !== ' '));
+    coverageCache.set(text, chars);
+  }
+  return chars;
+}
+function cumulativeText(
+  index: number,
+  variant: number,
+  weak: string[],
+  exercise: LessonExercise,
+  avoid: string,
+) {
+  const l = lessons[index];
+  const primary = lessonPool(index, exercise);
+  // A missing rare letter can be reviewed in a real word, never a random suffix.
+  // Topic reviews (e.g. Excel) stay within their own vocabulary.
+  const general = !!l.keys || [home, top, bottom, czech].includes(l.chapter);
+  const extra = exercise === 'sentences' && general ? lessonPool(index, 'words') : [];
+  const pool = [...new Set([...primary, ...extra])];
+  const offset = Math.abs(Math.floor(variant)) % pool.length;
+  const ordered = [...pool.slice(offset), ...pool.slice(0, offset)];
+  const coverage = new Map(pool.map((p) => [p, coverageChars(p)]));
+  const available = new Set([...coverage.values()].flatMap((chars) => [...chars]));
+  const missing = new Set([...coverageChars(learnedChars(index))].filter((c) => available.has(c)));
+  const fresh = new Set([...l.keys]);
+  const parts: string[] = [];
+  const used = new Set<string>();
+  const length = () => parts.join(' ').length;
+  function append(part: string) {
+    parts.push(part);
+    used.add(part);
+    for (const c of coverage.get(part)!) missing.delete(c);
+    for (const c of part) fresh.delete(c);
+  }
+  function best(candidates: string[], required: Set<string>, exact = false) {
+    return candidates
+      .filter((p) => !used.has(p) && length() + p.length + 1 <= 380)
+      .map((p, order) => ({
+        p,
+        order,
+        score:
+          [...required].filter((c) => (exact ? p.includes(c) : coverage.get(p)!.has(c))).length /
+          Math.sqrt(p.length),
+      }))
+      .filter((v) => v.score > 0)
+      .sort((a, b) => b.score - a.score || a.order - b.order)[0]?.p;
+  }
+  const preferred = ordered.filter((p) => primary.includes(p));
+  while (fresh.size) {
+    const part = best(preferred, fresh, true) ?? best(ordered, fresh, true);
+    if (!part) break;
+    append(part);
+  }
+  while (missing.size) {
+    const part = best(preferred, missing) ?? best(ordered, missing);
+    if (!part) break;
+    append(part);
+  }
+  // Alternate focused practice with unrestricted review; old-only words remain
+  // eligible even when a new pair or weak key is receiving extra attention.
+  const focus = [...l.keys, ...weak];
+  const focused = preferred.filter((p) => focus.some((c) => p.includes(c)));
+  let filler = 0;
+  while (length() < 115) {
+    const choices = filler % 2 === 0 && focused.length ? focused : preferred;
+    const part = choices[(offset + filler) % choices.length];
+    if (parts.at(-1) !== part || choices.length === 1) append(part);
+    filler++;
+  }
+  // Rotating complete words/phrases preserves meaning and varies repeat attempts.
+  for (let retry = 0; retry < parts.length; retry++) {
+    const start = (Math.abs(Math.floor(variant)) + retry) % parts.length;
+    const text = [...parts.slice(start), ...parts.slice(0, start)].join(' ');
+    if (textSignature(text) !== avoid) return text;
+  }
+  return `${parts.join(' ')} ${ordered[0]}`;
+}
 export function lessonText(
   index: number,
   variant: number,
@@ -674,6 +798,7 @@ export function lessonText(
   exercise: LessonExercise = 'sentences',
 ): string {
   const l = lessons[index] ?? lessons[0];
+  if (exercise !== 'touch') return cumulativeText(index, variant, weak, exercise, avoid);
   let pool = lessonPool(index, exercise);
   const focus = [...l.keys, ...weak];
   const relevant = pool.filter((p) => [...l.keys].some((k) => p.includes(k)));

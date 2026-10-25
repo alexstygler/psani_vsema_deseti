@@ -7,6 +7,7 @@ import {
   COURSE_VERSION,
   textSignature,
   lessonRules,
+  lessonPool,
 } from './curriculum';
 import {
   freshProgress,
@@ -54,26 +55,83 @@ describe('nový výukový kurz', () => {
       expect([...chars].sort()).toEqual([...rows[row]].sort());
     });
   });
-  it('každá lekce zavede nejvýše dva nové znaky a žádné zadání nepoužije dosud nenaučený znak', () => {
-    const seen = new Set<string>([' ']);
-    for (const [index, lesson] of lessons.entries()) {
-      expect([...lesson.keys].length).toBeLessThanOrEqual(2);
-      for (const c of lesson.keys) {
-        expect(seen.has(c), `${lesson.id}: ${c} už byl zaveden`).toBe(false);
-        seen.add(c);
-      }
-      for (const exercise of exerciseOrder)
-        for (const variant of [0, 1, 9]) {
-          const text = lessonText(index, variant, ['j', 'ř'], '', exercise);
-          expect(text.length).toBeGreaterThanOrEqual(exercise === 'touch' ? 24 : 100);
-          for (const c of text)
-            expect(seen.has(c), `${lesson.id}/${exercise}: neznámý znak ${c}`).toBe(true);
-          for (const c of lesson.keys)
-            expect(text, `${lesson.id}/${exercise}: chybí nový znak ${c}`).toContain(c);
-          expect(lessonText(index, variant, ['j', 'ř'], textSignature(text), exercise)).not.toBe(
-            text,
-          );
+  it.each([
+    [0, 25],
+    [25, 46],
+    [46, 67],
+  ])(
+    'lekce %i–%i mají nejvýše dva nové znaky a používají jen naučené znaky',
+    (from, to) => {
+      const seen = new Set<string>(learnedChars(from - 1));
+      for (let index = from; index < to; index++) {
+        const lesson = lessons[index];
+        expect([...lesson.keys].length).toBeLessThanOrEqual(2);
+        for (const c of lesson.keys) {
+          expect(seen.has(c), `${lesson.id}: ${c} už byl zaveden`).toBe(false);
+          seen.add(c);
         }
+        for (const exercise of exerciseOrder)
+          for (const variant of [0, 1, 9]) {
+            const text = lessonText(index, variant, ['j', 'ř'], '', exercise);
+            expect(text.length).toBeGreaterThanOrEqual(exercise === 'touch' ? 24 : 100);
+            const unknown = [...new Set(text)].filter((c) => !seen.has(c));
+            expect(unknown, `${lesson.id}/${exercise}: neznámé znaky`).toEqual([]);
+            for (const c of lesson.keys)
+              expect(text, `${lesson.id}/${exercise}: chybí nový znak ${c}`).toContain(c);
+            expect(lessonText(index, variant, ['j', 'ř'], textSignature(text), exercise)).not.toBe(
+              text,
+            );
+          }
+      }
+    },
+    15000,
+  );
+  it('po izolovaném osahání vrací všechny předchozí klávesy a od prvních slov už nepoužívá náhodné skupiny', () => {
+    for (let index = 0; index < 25; index++) {
+      for (const exercise of ['words', 'sentences'] as const) {
+        for (const variant of [0, 1, 9]) {
+          const text = lessonText(index, variant, ['j'], '', exercise);
+          for (const char of learnedChars(index))
+            expect(text, `${lessons[index].id}/${exercise}: chybí známý znak ${char}`).toContain(
+              char,
+            );
+          expect(text.length).toBeLessThanOrEqual(380);
+          if (index >= 3 && exercise === 'words') {
+            const vocabulary = lessonPool(index, 'words');
+            for (const word of text.split(' ')) expect(vocabulary).toContain(word);
+          }
+        }
+      }
+    }
+    // Introducing D/K does not contaminate their initial two-key warmup.
+    expect([...lessonText(1, 0, [], '', 'touch')].every((c) => 'dk '.includes(c))).toBe(true);
+    expect(lessonText(3, 0, [], '', 'words')).toContain('fajfka');
+    const firstSentences = lessonText(6, 0, [], '', 'sentences');
+    expect(firstSentences).toMatch(/hala je sklad|kde je les|jak se jde/);
+    const capitalTransition = lessonPool(37, 'sentences').join(' ');
+    expect(capitalTransition).toContain('dům');
+    expect(capitalTransition).not.toMatch(/DůM|LOď|TICHé/);
+  });
+  it('obě navazující cvičení vracejí dostupné předchozí hmaty i u velkých písmen, čísel a symbolů', () => {
+    for (let index = 25; index < lessons.length; index++) {
+      if (!lessons[index].keys) continue;
+      const vocabulary = [...lessonPool(index, 'words'), ...lessonPool(index)]
+        .join(' ')
+        .toLocaleLowerCase('cs');
+      const known = [...new Set(learnedChars(index).toLocaleLowerCase('cs'))].filter((c) =>
+        vocabulary.includes(c),
+      );
+      for (const variant of [0, 1, 9]) {
+        const text = (
+          lessonText(index, variant, [], '', 'words') +
+          ' ' +
+          lessonText(index, variant, [], '', 'sentences')
+        ).toLocaleLowerCase('cs');
+        expect(
+          known.filter((c) => !text.includes(c)),
+          lessons[index].id,
+        ).toEqual([]);
+      }
     }
   });
   it('souhrnný test používá jen znaky naučené v příslušné sekci', () => {

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { freshProgress } from '../src/engine';
+import { learnedChars } from '../src/curriculum';
 import { beginExercise, finishExercise } from './course-helpers';
 
 async function beginner(page: import('@playwright/test').Page) {
@@ -67,6 +68,7 @@ test('rozpracovaná lekce se po obnovení vrátí k dalšímu kroku', async ({ p
 test('ukázka horní řady zobrazí šipky a dva nové znaky, potom přijdou skutečná slova', async ({
   page,
 }) => {
+  test.setTimeout(90000);
   await page.addInitScript(
     (p) => {
       if (!localStorage.getItem('lehce.progress.v1'))
@@ -88,6 +90,12 @@ test('ukázka horní řady zobrazí šipky a dva nové znaky, potom přijdou sku
   const words = (await page.locator('.typing-text').textContent())!;
   expect(words).toMatch(/jde|kde|les|sedl|dali/);
   expect(words).not.toMatch(/[ěščřžýáíéú]/);
+  for (const char of learnedChars(6)) expect(words).toContain(char);
+  await finishExercise(page);
+  await page.keyboard.press('Enter');
+  const sentences = (await page.locator('.typing-text').textContent())!;
+  for (const char of learnedChars(6)) expect(sentences).toContain(char);
+  expect(sentences).toMatch(/hala je sklad|kde je les|jak se jde/);
 });
 
 test('účet je v hlavním panelu vidět i na nízké obrazovce', async ({ page }) => {

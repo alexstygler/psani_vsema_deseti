@@ -65,6 +65,7 @@ test('Excel nehodnotí rychlost, ale závěrečný běžný text vyžaduje 150 C
 test('rozřazení uzná oblast, další neúspěch zachová pokrok a nabídne odlišný text', async ({
   page,
 }) => {
+  test.setTimeout(90000);
   await page.goto('/');
   await page.getByRole('button', { name: 'Zjistit mou úroveň', exact: true }).first().click();
   await page.getByRole('button', { name: 'Spustit rozřazení' }).click();

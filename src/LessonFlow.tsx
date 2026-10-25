@@ -84,6 +84,12 @@ export default function LessonFlow({
                   ? 'Celé zadání, nejvýše 3 chyby. Rychlost nehodnotíme.'
                   : 'Celé zadání, alespoň 150 CPM a nejvýše 3 chyby.'}
             </p>
+            {step > 0 && (
+              <p>
+                Nové hmaty teď spojujeme se všemi dříve naučenými. Jakmile to známá písmena dovolí,
+                píšete skutečná slova a věty.
+              </p>
+            )}
           </div>
           {renderExercise({
             exercise: exerciseOrder[step],
